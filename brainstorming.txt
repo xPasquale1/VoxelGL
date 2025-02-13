@@ -1,0 +1,18 @@
+ein cluster repräsentiert ein 256x256x256 texture.
+das erste cluster beim spieler hat genau diese auflösung.
+die nächsten 8 cluster drum herum haben nur noch eine auflösung von 128x128x128
+die nächsten darum haben 64x64x64 und alle weiteren auch
+Vorteile:
+(vielleicht sogar 512x512x512 -> 536MB)
+256x256x256     -> 67MB
+128x128x128 * 8 -> 67MB
+64x64x64 * 16   -> 16MB
+64x64x64 * 32   -> 33MB
+etc.
+Deutlich weniger Speicher und Details weiter weg sieht man eh nicht mehr so gut
+Hoffentlich bessere Raytracing Performance
+Nachteile:
+Optimale Übergänge müssen berechnet werden
+Raymarching muss an die neuen Auflösungen angepasst werden, da Voxel nun doppelt so groß sind
+Niedrigere Auflösungen müssen on the fly berechnet und allokiert werden
+Wahrscheinlich muss das mit mehreren 3D Texturen umgesetzt werden

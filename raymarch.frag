@@ -1,0 +1,111 @@
+#version 330 core
+
+precision highp float;
+
+in vec4 gl_FragCoord;
+
+uniform vec3 camPos;
+uniform mat3 camRot;
+uniform sampler3D sdfData;
+uniform sampler3D sdfDataLow;
+uniform vec2 windowSize;
+uniform ivec3 sdfSize;
+
+out vec4 fragColor;
+
+//TODO Der ganze Code hat so viele "Fixes"...
+
+vec3 intersect(vec3 position, vec3 dir, out vec3 normal, float scale){
+    float eps = 0.0001;
+    if(dir.x < 0.0 && abs(fract(position.x)) < eps) position.x -= eps;
+    if(dir.y < 0.0 && abs(fract(position.y)) < eps) position.y -= eps;
+    if(dir.z < 0.0 && abs(fract(position.z)) < eps) position.z -= eps;
+
+    vec3 minBox = floor(position/scale)*scale;
+    vec3 maxBox = minBox + vec3(scale);
+    vec3 tv;
+
+    if(dir.x < 0.0) tv.x = (minBox.x-position.x)/dir.x;
+    else tv.x = (maxBox.x-position.x)/dir.x;
+
+    if(dir.y < 0.0) tv.y = (minBox.y-position.y)/dir.y;
+    else tv.y = (maxBox.y-position.y)/dir.y;
+
+    if(dir.z < 0.0) tv.z = (minBox.z-position.z)/dir.z;
+    else tv.z = (maxBox.z-position.z)/dir.z;
+    
+    normal = vec3(-sign(dir.x), 0, 0);
+    float t = tv.x;
+    if(tv.y < t){
+        t = tv.y;
+        normal = vec3(0, -sign(dir.y), 0);
+    }
+    if(tv.z < t){
+        t = tv.z;
+        normal = vec3(0, 0, -sign(dir.z));
+    }
+    return position + dir*(t+0.0005);
+}
+
+bool trace(vec3 position, vec3 dir, out vec3 hitPos, out vec3 normal, float maxLength){
+    vec3 startPos = position;
+    for(int i=0; i < 512; ++i){
+        if(distance(startPos, position) > maxLength) return false;
+        if(any(lessThan(position, vec3(0))) || any(greaterThanEqual(position, vec3(sdfSize)))) return false;
+        vec4 sdfInfo = texelFetch(sdfDataLow, ivec3(position/8), 0);
+        if(sdfInfo.r > 0.1){
+            vec3 minBox = floor(position/8)*8;
+            vec3 maxBox = minBox + vec3(8);
+            for(int j=0; j < 64; j++){
+                if(distance(startPos, position) > maxLength) return false;
+                if(any(lessThan(position, minBox)) || any(greaterThan(position, maxBox))) break;
+                sdfInfo = texelFetch(sdfData, ivec3(position), 0);
+                if(sdfInfo.a > 0.1){
+                    hitPos = position;
+                    return true;
+                }
+                position = intersect(position, dir, normal, 1.0);
+            }
+            continue;
+        }
+        position = intersect(position, dir, normal, 8.0);
+    }
+    return false;
+}
+
+void main(){
+    float aspect = float(windowSize.x)/float(windowSize.y);
+    vec2 uv = gl_FragCoord.xy/windowSize*2.0-vec2(1.0);
+    uv.x *= aspect;
+
+    vec3 position = camPos;
+    vec3 dir = normalize(vec3(uv, 1.5));
+    dir = camRot * dir;
+    
+    vec3 hitPos;
+    vec3 normal;
+    if(trace(position, dir, hitPos, normal, 10000)){
+        vec3 sdfInfo = texelFetch(sdfData, ivec3(hitPos), 0).rgb;
+        fragColor = vec4(sdfInfo, 1);
+
+        vec3 reflPos = hitPos;
+        vec3 reflDir = dir;
+        vec3 reflNormal = normal;
+        position = hitPos;
+        dir = normalize(vec3(0.25, 1.0, 0.1));
+        // position = intersect(position, dir, normal, 1.0);
+        position += normal * 0.01;
+        if(trace(position, dir, hitPos, normal, 10000)) fragColor.rgb *= 0.2;
+
+        position = reflPos;
+        dir = reflect(reflDir, reflNormal);
+        position += reflNormal * 0.01;
+        if(trace(position, dir, hitPos, normal, 10000)){
+            sdfInfo = texelFetch(sdfData, ivec3(hitPos), 0).rgb;
+            fragColor.rgb = mix(fragColor.rgb, sdfInfo, 0.3);
+        }
+        
+        return;
+    }
+    fragColor = vec4(0.0);
+}

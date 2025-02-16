@@ -14,6 +14,7 @@ uniform ivec3 sdfSize;
 out vec4 fragColor;
 
 //TODO Der ganze Code hat so viele "Fixes"...
+//Man sollte nicht per 0.0005 in den nächsten Voxel steppen, sondern einfach die Position zusätzlich als Mittelpunkt im Voxel speichern
 
 vec3 intersect(vec3 position, vec3 dir, out vec3 normal, float scale){
     float eps = 0.0001;
@@ -45,6 +46,29 @@ vec3 intersect(vec3 position, vec3 dir, out vec3 normal, float scale){
         normal = vec3(0, 0, -sign(dir.z));
     }
     return position + dir*(t+0.0005);
+}
+
+uint rng_state;
+float random(){
+    rng_state = 1664525U * rng_state + 1013904223U;
+    return float(rng_state)/4294967295.;
+}
+
+vec3 randomHemisphereVector(vec3 normal){
+    float rand = random();
+    float theta = 2. * 3.14159265359 * rand;
+    rand = random();
+    float phi = 2. * 3.14159265359 * rand;
+
+    float x = sin(theta) * cos(phi);
+    float y = sin(theta) * sin(phi);
+    float z = cos(theta);
+
+    vec3 randomVec = vec3(x, y, z);
+
+    if(dot(randomVec, normal) < 0.0) randomVec = -randomVec;
+
+    return randomVec;
 }
 
 bool trace(vec3 position, vec3 dir, out vec3 hitPos, out vec3 normal, float maxLength){
@@ -93,17 +117,26 @@ void main(){
         vec3 reflNormal = normal;
         position = hitPos;
         dir = normalize(vec3(0.25, 1.0, 0.1));
-        // position = intersect(position, dir, normal, 1.0);
         position += normal * 0.01;
         if(trace(position, dir, hitPos, normal, 10000)) fragColor.rgb *= 0.2;
 
-        position = reflPos;
-        dir = reflect(reflDir, reflNormal);
-        position += reflNormal * 0.01;
-        if(trace(position, dir, hitPos, normal, 10000)){
-            sdfInfo = texelFetch(sdfData, ivec3(hitPos), 0).rgb;
-            fragColor.rgb = mix(fragColor.rgb, sdfInfo, 0.3);
+        rng_state = uint(fract(sin(dot(gl_FragCoord.xy/vec2(1920, 1080), vec2(12.9898, 78.233))) * 43758.5453123) * 1000.0);
+        float amount = 16;
+        for(int i=0; i < 16; ++i){
+            dir = randomHemisphereVector(reflNormal);
+            position = reflPos + reflNormal * 0.01;
+            if(trace(position, dir, hitPos, normal, 10)) amount -= (10-length(hitPos - reflPos))*0.1;
         }
+        amount /= 16;
+        fragColor.rgb *= amount;
+
+        // position = reflPos;
+        // dir = reflect(reflDir, reflNormal);
+        // position += reflNormal * 0.01;
+        // if(trace(position, dir, hitPos, normal, 10000)){
+        //     sdfInfo = texelFetch(sdfData, ivec3(hitPos), 0).rgb;
+        //     fragColor.rgb = mix(fragColor.rgb, sdfInfo, 0.3);
+        // }
         
         return;
     }

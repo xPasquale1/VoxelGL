@@ -1,3 +1,6 @@
 /.vscode
 *.exe
 /fonts
+objects/classroom_low_poly.mtl
+objects/classroom_low_poly.obj
+objects/forest0.obj

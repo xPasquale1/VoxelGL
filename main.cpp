@@ -114,6 +114,7 @@ INT WinMain(HINSTANCE hInstance, HINSTANCE hPreviousInst, LPSTR lpszCmdLine, int
 	if(ErrCheck(loadObj("objects/sponza.obj", models, modelCount, materials, materialCount, 0, 0, 0, 0), "Modell laden") != SUCCESS) return -1;
 
 	GLint sdfSize[3] = {1472, 640, 880};
+	// GLint sdfSize[3] = {1600, 490, 1304};
 	camPos = {(float)sdfSize[0]/2, (float)sdfSize[1]/2, (float)sdfSize[2]/2};
 	GLuint sdfTextures[2];
 	createSDFLevels(models, modelCount, sdfTextures, sdfSize[0], sdfSize[1], sdfSize[2]);

@@ -16,3 +16,7 @@ Optimale Übergänge müssen berechnet werden
 Raymarching muss an die neuen Auflösungen angepasst werden, da Voxel nun doppelt so groß sind
 Niedrigere Auflösungen müssen on the fly berechnet und allokiert werden
 Wahrscheinlich muss das mit mehreren 3D Texturen umgesetzt werden
+
+Anstatt per Pixel Lighting zu haben sollte man per Voxel Lighting machen
+Umsetzung per Raymarching über jeden Pixel (in einem compute shader) und dann speichern der getroffenen
+Position in einer Hashmap, dann hat man nur eine Liste aller getroffenen Positionen

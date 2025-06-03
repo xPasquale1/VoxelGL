@@ -76,13 +76,12 @@ bool trace(vec3 position, vec3 dir, out vec3 hitPos, out vec3 normal, float maxL
     for(int i=0; i < 512; ++i){
         if(distance(startPos, position) > maxLength) return false;
         if(any(lessThan(position, vec3(0))) || any(greaterThanEqual(position, vec3(sdfSize)))) return false;
-        vec4 sdfInfo = texelFetch(sdfDataLow, ivec3(position/8), 0);
+        ivec3 lowresBlock = ivec3(position/4);
+        vec4 sdfInfo = texelFetch(sdfDataLow, lowresBlock, 0);
         if(sdfInfo.r > 0.1){
-            vec3 minBox = floor(position/8)*8;
-            vec3 maxBox = minBox + vec3(8);
-            for(int j=0; j < 64; j++){
+            for(int j=0; j < 16; j++){
                 if(distance(startPos, position) > maxLength) return false;
-                if(any(lessThan(position, minBox)) || any(greaterThan(position, maxBox))) break;
+                if(ivec3(position/4) != lowresBlock) break;
                 sdfInfo = texelFetch(sdfData, ivec3(position), 0);
                 if(sdfInfo.a > 0.1){
                     hitPos = position;
@@ -92,10 +91,13 @@ bool trace(vec3 position, vec3 dir, out vec3 hitPos, out vec3 normal, float maxL
             }
             continue;
         }
-        position = intersect(position, dir, normal, 8.0);
+        position = intersect(position, dir, normal, 4.0);
     }
     return false;
 }
+
+#define SSAO_SAMPLES 16
+#define GI_SAMPLES 8
 
 void main(){
     float aspect = float(windowSize.x)/float(windowSize.y);
@@ -121,24 +123,33 @@ void main(){
         if(trace(position, dir, hitPos, normal, 10000)) fragColor.rgb *= 0.2;
 
         rng_state = uint(fract(sin(dot(gl_FragCoord.xy/vec2(1920, 1080), vec2(12.9898, 78.233))) * 43758.5453123) * 1000.0);
-        float amount = 16;
-        for(int i=0; i < 16; ++i){
-            dir = randomHemisphereVector(reflNormal);
-            position = reflPos + reflNormal * 0.01;
-            if(trace(position, dir, hitPos, normal, 10)) amount -= (10-length(hitPos - reflPos))*0.1;
-        }
-        amount /= 16;
-        fragColor.rgb *= amount;
-
-        // position = reflPos;
-        // dir = reflect(reflDir, reflNormal);
-        // position += reflNormal * 0.01;
-        // if(trace(position, dir, hitPos, normal, 10000)){
-        //     sdfInfo = texelFetch(sdfData, ivec3(hitPos), 0).rgb;
-        //     fragColor.rgb = mix(fragColor.rgb, sdfInfo, 0.3);
+        // float amount = SSAO_SAMPLES;
+        // for(int i=0; i < SSAO_SAMPLES; ++i){
+        //     dir = randomHemisphereVector(reflNormal);
+        //     position = reflPos + reflNormal * 0.01;
+        //     if(trace(position, dir, hitPos, normal, 1000)) amount -= (10-length(hitPos - reflPos))*0.1;
         // }
+        // amount /= SSAO_SAMPLES;
+        // fragColor.rgb *= amount;
+
+        // for(int i=0; i < GI_SAMPLES; ++i){
+        //     dir = = randomHemisphereVector(reflNormal);
+        //     position = reflPos + reflNormal * 0.01;
+        //     if(trace(position, dir, hitPos, normal, 1000)){
+
+        //     }
+        // }
+
+        if(dot(reflNormal, vec3(0, 1, 0)) < 0.98) return;
+        position = reflPos;
+        dir = reflect(reflDir, reflNormal);
+        position += reflNormal * 0.01;
+        if(trace(position, dir, hitPos, normal, 10000)){
+            sdfInfo = texelFetch(sdfData, ivec3(hitPos), 0).rgb;
+            fragColor.rgb = mix(fragColor.rgb, sdfInfo, 0.3);
+        }
         
         return;
     }
-    fragColor = vec4(0.0);
+    fragColor = vec4(0, 0.3, 1.0, 1.0);
 }

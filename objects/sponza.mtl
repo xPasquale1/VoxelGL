@@ -10,7 +10,7 @@ Ke 0.000000 0.000000 0.000000
 Ni 1.450000
 d 1.000000
 illum 2
-map_Kd D:\\Eclipse Workspace\\Software-3D-Engine\\textures\\sponza\\lion.tex
+map_Kd C:\\programming_stuff\\VoxelGL\\textures\\sponza\\lion.png
 
 newmtl Material__298
 Ns 225.000000
@@ -21,7 +21,7 @@ Ke 0.000000 0.000000 0.000000
 Ni 1.450000
 d 1.000000
 illum 2
-map_Kd D:\\Eclipse Workspace\\Software-3D-Engine\\textures\\sponza\\background.tex
+map_Kd C:\\programming_stuff\\VoxelGL\\textures\\sponza\\background.png
 
 newmtl Material__57
 Ns 225.000000
@@ -32,8 +32,8 @@ Ke 0.000000 0.000000 0.000000
 Ni 1.450000
 d 1.000000
 illum 2
-map_Kd D:\\Eclipse Workspace\\Software-3D-Engine\\textures\\sponza\\vase_plant.tex
-map_d D:\\Eclipse Workspace\\Software-3D-Engine\\textures\\sponza\\vase_plant.tex
+map_Kd C:\\programming_stuff\\VoxelGL\\textures\\sponza\\vase_plant.png
+map_d C:\\programming_stuff\\VoxelGL\\textures\\sponza\\vase_plant.png
 
 newmtl arch
 Ns 225.000000
@@ -44,7 +44,7 @@ Ke 0.000000 0.000000 0.000000
 Ni 1.450000
 d 1.000000
 illum 2
-map_Kd D:\\Eclipse Workspace\\Software-3D-Engine\\textures\\sponza\\sponza_arch_diff.tex
+map_Kd C:\\programming_stuff\\VoxelGL\\textures\\sponza\\sponza_arch_diff.png
 
 newmtl bricks
 Ns 225.000000
@@ -55,7 +55,7 @@ Ke 0.000000 0.000000 0.000000
 Ni 1.450000
 d 1.000000
 illum 2
-map_Kd D:\\Eclipse Workspace\\Software-3D-Engine\\textures\\sponza\\spnza_bricks_a_diff.tex
+map_Kd C:\\programming_stuff\\VoxelGL\\textures\\sponza\\spnza_bricks_a_diff.png
 
 newmtl ceiling
 Ns 225.000000
@@ -66,7 +66,7 @@ Ke 0.000000 0.000000 0.000000
 Ni 1.450000
 d 1.000000
 illum 2
-map_Kd D:\\Eclipse Workspace\\Software-3D-Engine\\textures\\sponza\\sponza_ceiling_a_diff.tex
+map_Kd C:\\programming_stuff\\VoxelGL\\textures\\sponza\\sponza_ceiling_a_diff.png
 
 newmtl chain
 Ns 225.000000
@@ -77,8 +77,8 @@ Ke 0.000000 0.000000 0.000000
 Ni 1.450000
 d 1.000000
 illum 2
-map_Kd D:\\Eclipse Workspace\\Software-3D-Engine\\textures\\sponza\\chain_texture.tex
-map_d D:\\Eclipse Workspace\\Software-3D-Engine\\textures\\sponza\\chain_texture.tex
+map_Kd C:\\programming_stuff\\VoxelGL\\textures\\sponza\\chain_texture.png
+map_d C:\\programming_stuff\\VoxelGL\\textures\\sponza\\chain_texture.png
 
 newmtl column_a
 Ns 225.000000
@@ -89,7 +89,7 @@ Ke 0.000000 0.000000 0.000000
 Ni 1.450000
 d 1.000000
 illum 2
-map_Kd D:\\Eclipse Workspace\\Software-3D-Engine\\textures\\sponza\\sponza_column_a_diff.tex
+map_Kd C:\\programming_stuff\\VoxelGL\\textures\\sponza\\sponza_column_a_diff.png
 
 newmtl column_b
 Ns 225.000000
@@ -100,7 +100,7 @@ Ke 0.000000 0.000000 0.000000
 Ni 1.450000
 d 1.000000
 illum 2
-map_Kd D:\\Eclipse Workspace\\Software-3D-Engine\\textures\\sponza\\sponza_column_b_diff.tex
+map_Kd C:\\programming_stuff\\VoxelGL\\textures\\sponza\\sponza_column_b_diff.png
 
 newmtl column_c
 Ns 225.000000
@@ -111,7 +111,7 @@ Ke 0.000000 0.000000 0.000000
 Ni 1.450000
 d 1.000000
 illum 2
-map_Kd D:\\Eclipse Workspace\\Software-3D-Engine\\textures\\sponza\\sponza_column_c_diff.tex
+map_Kd C:\\programming_stuff\\VoxelGL\\textures\\sponza\\sponza_column_c_diff.png
 
 newmtl details
 Ns 225.000000
@@ -122,7 +122,7 @@ Ke 0.000000 0.000000 0.000000
 Ni 1.450000
 d 1.000000
 illum 2
-map_Kd D:\\Eclipse Workspace\\Software-3D-Engine\\textures\\sponza\\sponza_details_diff.tex
+map_Kd C:\\programming_stuff\\VoxelGL\\textures\\sponza\\sponza_details_diff.png
 
 newmtl fabric_a
 Ns 225.000000
@@ -133,7 +133,7 @@ Ke 0.000000 0.000000 0.000000
 Ni 1.450000
 d 1.000000
 illum 2
-map_Kd D:\\Eclipse Workspace\\Software-3D-Engine\\textures\\sponza\\sponza_fabric_diff.tex
+map_Kd C:\\programming_stuff\\VoxelGL\\textures\\sponza\\sponza_fabric_diff.png
 
 newmtl fabric_c
 Ns 225.000000
@@ -144,7 +144,7 @@ Ke 0.000000 0.000000 0.000000
 Ni 1.450000
 d 1.000000
 illum 2
-map_Kd D:\\Eclipse Workspace\\Software-3D-Engine\\textures\\sponza\\sponza_curtain_diff.tex
+map_Kd C:\\programming_stuff\\VoxelGL\\textures\\sponza\\sponza_curtain_diff.png
 
 newmtl fabric_d
 Ns 225.000000
@@ -155,7 +155,7 @@ Ke 0.000000 0.000000 0.000000
 Ni 1.450000
 d 1.000000
 illum 2
-map_Kd D:\\Eclipse Workspace\\Software-3D-Engine\\textures\\sponza\\sponza_fabric_blue_diff.tex
+map_Kd C:\\programming_stuff\\VoxelGL\\textures\\sponza\\sponza_fabric_blue_diff.png
 
 newmtl fabric_e
 Ns 225.000000
@@ -166,7 +166,7 @@ Ke 0.000000 0.000000 0.000000
 Ni 1.450000
 d 1.000000
 illum 2
-map_Kd D:\\Eclipse Workspace\\Software-3D-Engine\\textures\\sponza\\sponza_fabric_green_diff.tex
+map_Kd C:\\programming_stuff\\VoxelGL\\textures\\sponza\\sponza_fabric_green_diff.png
 
 newmtl fabric_f
 Ns 225.000000
@@ -177,7 +177,7 @@ Ke 0.000000 0.000000 0.000000
 Ni 1.450000
 d 1.000000
 illum 2
-map_Kd D:\\Eclipse Workspace\\Software-3D-Engine\\textures\\sponza\\sponza_curtain_green_diff.tex
+map_Kd C:\\programming_stuff\\VoxelGL\\textures\\sponza\\sponza_curtain_green_diff.png
 
 newmtl fabric_g
 Ns 225.000000
@@ -188,7 +188,7 @@ Ke 0.000000 0.000000 0.000000
 Ni 1.450000
 d 1.000000
 illum 2
-map_Kd D:\\Eclipse Workspace\\Software-3D-Engine\\textures\\sponza\\sponza_curtain_blue_diff.tex
+map_Kd C:\\programming_stuff\\VoxelGL\\textures\\sponza\\sponza_curtain_blue_diff.png
 
 newmtl flagpole
 Ns 225.000000
@@ -199,7 +199,7 @@ Ke 0.000000 0.000000 0.000000
 Ni 1.450000
 d 1.000000
 illum 2
-map_Kd D:\\Eclipse Workspace\\Software-3D-Engine\\textures\\sponza\\sponza_flagpole_diff.tex
+map_Kd C:\\programming_stuff\\VoxelGL\\textures\\sponza\\sponza_flagpole_diff.png
 
 newmtl floor
 Ns 225.000000
@@ -210,7 +210,7 @@ Ke 0.000000 0.000000 0.000000
 Ni 1.450000
 d 1.000000
 illum 2
-map_Kd D:\\Eclipse Workspace\\Software-3D-Engine\\textures\\sponza\\sponza_floor_a_diff.tex
+map_Kd C:\\programming_stuff\\VoxelGL\\textures\\sponza\\sponza_floor_a_diff.png
 
 newmtl leaf
 Ns 225.000000
@@ -221,8 +221,8 @@ Ke 0.000000 0.000000 0.000000
 Ni 1.450000
 d 1.000000
 illum 2
-map_Kd D:\\Eclipse Workspace\\Software-3D-Engine\\textures\\sponza\\sponza_thorn_diff.tex
-map_d D:\\Eclipse Workspace\\Software-3D-Engine\\textures\\sponza\\sponza_thorn_diff.tex
+map_Kd C:\\programming_stuff\\VoxelGL\\textures\\sponza\\sponza_thorn_diff.png
+map_d C:\\programming_stuff\\VoxelGL\\textures\\sponza\\sponza_thorn_diff.png
 
 newmtl roof
 Ns 225.000000
@@ -233,8 +233,8 @@ Ke 0.000000 0.000000 0.000000
 Ni 1.450000
 d 1.000000
 illum 2
-map_Kd D:\\Eclipse Workspace\\Software-3D-Engine\\textures\\sponza\\sponza_roof_diff.tex
-map_d D:\\Eclipse Workspace\\Software-3D-Engine\\textures\\sponza\\sponza_roof_diff.tex
+map_Kd C:\\programming_stuff\\VoxelGL\\textures\\sponza\\sponza_roof_diff.png
+map_d C:\\programming_stuff\\VoxelGL\\textures\\sponza\\sponza_roof_diff.png
 
 newmtl vase
 Ns 225.000000
@@ -245,7 +245,7 @@ Ke 0.000000 0.000000 0.000000
 Ni 1.450000
 d 1.000000
 illum 2
-map_Kd D:\\Eclipse Workspace\\Software-3D-Engine\\textures\\sponza\\vase_dif.tex
+map_Kd C:\\programming_stuff\\VoxelGL\\textures\\sponza\\vase_diff.png
 
 newmtl vase_hanging
 Ns 225.000000
@@ -256,7 +256,7 @@ Ke 0.000000 0.000000 0.000000
 Ni 1.450000
 d 1.000000
 illum 2
-map_Kd D:\\Eclipse Workspace\\Software-3D-Engine\\textures\\sponza\\vase_hanging.tex
+map_Kd C:\\programming_stuff\\VoxelGL\\textures\\sponza\\vase_hanging.png
 
 newmtl vase_round
 Ns 225.000000
@@ -267,4 +267,4 @@ Ke 0.000000 0.000000 0.000000
 Ni 1.450000
 d 1.000000
 illum 2
-map_Kd D:\\Eclipse Workspace\\Software-3D-Engine\\textures\\sponza\\vase_round.tex
+map_Kd C:\\programming_stuff\\VoxelGL\\textures\\sponza\\vase_round.png

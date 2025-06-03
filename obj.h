@@ -341,7 +341,14 @@ ErrCode loadMtl(const char* filename, Material* materials, DWORD& materialCount)
 					index += 2;
 				}
 				if(materials[materialCount-1].textures[textureIdx].data == nullptr) destroyImage(materials[materialCount-1].textures[textureIdx]);
-				if(ErrCheck(loadImage(textureFile.c_str(), materials[materialCount-1].textures[textureIdx]), "Texture laden") != SUCCESS) return ErrCheck(ERR_MATERIAL_BAD_FORMAT, std::string(word + " in Zeile: " + longToString(lineNumber)).c_str());
+				if(textureFile.size() < 4) return ErrCheck(ERR_MATERIAL_BAD_FORMAT, std::string(word + " in Zeile " + longToString(lineNumber)).c_str());
+				std::string fileEnding = textureFile.substr(textureFile.size()-4, 4);
+				if(fileEnding == ".tex"){
+					if(ErrCheck(loadImage(textureFile.c_str(), materials[materialCount-1].textures[textureIdx]), "Texture laden") != SUCCESS) return ErrCheck(ERR_MATERIAL_BAD_FORMAT, std::string(word + " in Zeile: " + longToString(lineNumber)).c_str());
+				}
+				else if(fileEnding == ".png"){
+					if(ErrCheck(loadPng(textureFile.c_str(), materials[materialCount-1].textures[textureIdx]), "Texture laden") != SUCCESS) return ErrCheck(ERR_MATERIAL_BAD_FORMAT, std::string(word + " in Zeile: " + longToString(lineNumber)).c_str());
+				}
 				flipImageVertically(materials[materialCount-1].textures[textureIdx]);	//TODO warum nur ist das nötig?
 				materials[materialCount-1].textureCount = 1;
 				//TODO Das ist nur eine Übergangslösung und sollte besser implementiert werden
@@ -648,8 +655,6 @@ void calculateSDFFromMesh(DWORD* sdfData, DWORD dx, DWORD dy, DWORD dz, Triangle
     float modelSizeY = maxY - minY;
     float modelSizeZ = maxZ - minZ;
 
-	DWORD voxels = 0;
-
     float* marked = alloc<float>(dx * dy * dz, "SDF-Gen-MarkedArray");
     for(DWORD i=0; i < dx*dy*dz; ++i) marked[i] = 1000000.f;
 
@@ -702,13 +707,11 @@ void calculateSDFFromMesh(DWORD* sdfData, DWORD dx, DWORD dy, DWORD dz, Triangle
 							float v = dstInfo.u * v1 + dstInfo.v * v2 + dstInfo.w * v3;
 							sdfData[idx] = textureRepeated(model.material->textures[0], u, v);
 							marked[idx] = dstInfo.distance;
-							voxels++;
 						}
 					}
 				}
 			}
 		}
 	}
-	std::cout << voxels << std::endl;
     dealloc(marked);
 }

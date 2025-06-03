@@ -26,6 +26,10 @@ void createSDFLevels(TriangleModel* models, DWORD modelCount, GLuint* texture, G
 	glActiveTexture(GL_TEXTURE1);
     glBindTexture(GL_TEXTURE_3D, texture[0]);
 
+	glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+	glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
+	glPixelStorei(GL_UNPACK_IMAGE_HEIGHT, 0);
+
     DWORD* sdfData = alloc<DWORD>(dx*dy*dz, "SDF Daten");
 	for(DWORD i=0; i < dx*dy*dz; ++i) sdfData[i] = 0;
 
@@ -37,12 +41,9 @@ void createSDFLevels(TriangleModel* models, DWORD modelCount, GLuint* texture, G
 
     glTexImage3D(GL_TEXTURE_3D, 0, GL_RGBA8, dx, dy, dz, 0, GL_BGRA, GL_UNSIGNED_BYTE, sdfData);
 	glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-	GLint mipdx = dx/8;
-	if(dx%8) mipdx += 2;
-	GLint mipdy = dy/8;
-	if(dy%8) mipdy += 2;
-	GLint mipdz = dz/8;
-	if(dz%8) mipdz += 2;
+	GLint mipdx = std::ceil((float)dx/4);
+	GLint mipdy = std::ceil((float)dy/4);
+	GLint mipdz = std::ceil((float)dz/4);
 	BYTE* sdfMipMap = alloc<BYTE>(mipdx*mipdy*mipdz, "SDF MipMap");
 
 	float total = getMemoryUsageByTag("SDF Daten");
@@ -62,7 +63,7 @@ void createSDFLevels(TriangleModel* models, DWORD modelCount, GLuint* texture, G
 	for(GLint x=0; x < dx; ++x){
 		for(GLint y=0; y < dy; ++y){
 			for(GLint z=0; z < dz; ++z){
-				if(A(sdfData[z * dy * dx + y * dx + x]) > 0) sdfMipMap[(z/8) * mipdy * mipdx + (y/8) * mipdx + (x/8)] = 255;
+				if(A(sdfData[z * dy * dx + y * dx + x]) > 0) sdfMipMap[(z/4) * mipdy * mipdx + (y/4) * mipdx + (x/4)] = 255;
 			}
 		}
 	}
@@ -113,8 +114,30 @@ INT WinMain(HINSTANCE hInstance, HINSTANCE hPreviousInst, LPSTR lpszCmdLine, int
 	DWORD materialCount = 0;
 	if(ErrCheck(loadObj("objects/sponza.obj", models, modelCount, materials, materialCount, 0, 0, 0, 0), "Modell laden") != SUCCESS) return -1;
 
-	GLint sdfSize[3] = {1472, 640, 880};
-	// GLint sdfSize[3] = {1600, 490, 1304};
+	fvec3 modelMin = {0};
+	fvec3 modelMax = {0};
+	for(DWORD i=0; i < modelCount; ++i){
+		for(DWORD j=0; j < models[i].triangleCount; ++j){
+			for(BYTE k=0; k < 3; ++k){
+				modelMin.x = min(models[i].triangles[j].points[k].x, modelMin.x);
+				modelMin.y = min(models[i].triangles[j].points[k].y, modelMin.y);
+				modelMin.z = min(models[i].triangles[j].points[k].z, modelMin.z);
+				modelMax.x = max(models[i].triangles[j].points[k].x, modelMax.x);
+				modelMax.y = max(models[i].triangles[j].points[k].y, modelMax.y);
+				modelMax.z = max(models[i].triangles[j].points[k].z, modelMax.z);
+			}
+		}
+	}
+
+	float dx = modelMax.x-modelMin.x;
+	float dy = modelMax.y-modelMin.y;
+	float dz = modelMax.z-modelMin.z;
+	float totalVolume = dx*dy*dz;
+	float targetVolume = 1600*1000*1000;
+	float scale = std::cbrtf(targetVolume/totalVolume);
+	GLint sdfSize[3] = {(GLint)(dx*scale), (GLint)(dy*scale), (GLint)(dz*scale)};
+	std::cout << sdfSize[0] << ", " << sdfSize[1] << ", " << sdfSize[2] << std::endl;
+	std::cout << "Voxels: " << sdfSize[0]*sdfSize[1]*sdfSize[2] << std::endl;
 	camPos = {(float)sdfSize[0]/2, (float)sdfSize[1]/2, (float)sdfSize[2]/2};
 	GLuint sdfTextures[2];
 	createSDFLevels(models, modelCount, sdfTextures, sdfSize[0], sdfSize[1], sdfSize[2]);

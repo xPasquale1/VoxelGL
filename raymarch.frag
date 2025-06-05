@@ -177,8 +177,7 @@ void main(){
 
         // lighting.rgb = direct_light;
         // lighting.rgb = indirect_light;
-        // lighting.rgb = direct_light + indirect_light;
-        lighting.rgb = primary_hit_data.color;
+        lighting.rgb = direct_light + indirect_light;
         return;
     }
     albedo = sky_color;

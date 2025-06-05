@@ -113,7 +113,7 @@ struct GBuffer{
 		glBindTexture(GL_TEXTURE_2D, albedo);
 		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-		glActiveTexture(GL_TEXTURE4);
+		glActiveTexture(GL_TEXTURE5);
 		glBindTexture(GL_TEXTURE_2D, lighting);
 		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
@@ -171,13 +171,13 @@ void createSDFLevels(TriangleModel* models, DWORD modelCount, GLuint* texture, G
 	BYTE* sdfMipMap8 = alloc<BYTE>(mipdx8*mipdy8*mipdz8, "SDF MipMap8");
 
 	for(GLint i=0; i < mipdx8*mipdy8*mipdz8; ++i) sdfMipMap8[i] = 0;
-	// for(GLint x=0; x < dx; ++x){
-	// 	for(GLint y=0; y < dy; ++y){
-	// 		for(GLint z=0; z < dz; ++z){
-	// 			if(A(sdfData[z * dy * dx + y * dx + x]) > 0) sdfMipMap8[(z/8) * mipdy8 * mipdx8 + (y/8) * mipdx8 + (x/8)] = 255;
-	// 		}
-	// 	}
-	// }
+	for(GLint x=0; x < dx; ++x){
+		for(GLint y=0; y < dy; ++y){
+			for(GLint z=0; z < dz; ++z){
+				if(A(sdfData[z * dy * dx + y * dx + x]) > 0) sdfMipMap8[(z/8) * mipdy8 * mipdx8 + (y/8) * mipdx8 + (x/8)] = 255;
+			}
+		}
+	}
 	glActiveTexture(GL_TEXTURE3);
 	glBindTexture(GL_TEXTURE_3D, texture[2]);
 	glTexImage3D(GL_TEXTURE_3D, 0, GL_R8, mipdx8, mipdy8, mipdz8, 0, GL_RED, GL_UNSIGNED_BYTE, sdfMipMap8);

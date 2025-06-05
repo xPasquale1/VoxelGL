@@ -16,10 +16,115 @@ float rotM[9]{
 };
 bool menuOpen = true;
 
-struct AABB{
-	fvec3 min;
-	fvec3 max;
+struct GLProgram{
+	GLuint program = 0;
+	GLuint vertexShader = 0;
+	GLuint fragmentShader = 0;
+
+	GLProgram(){
+		program = glCreateProgram();
+	}
+
+	~GLProgram(){
+		glDeleteProgram(program);
+	}
+
+	ErrCode attachVertexShader(const char* code, const DWORD code_length){
+		glDetachShader(program, vertexShader);
+		if(ErrCheck(loadShader(vertexShader, GL_VERTEX_SHADER, code, code_length), "Vertex Shader laden") != SUCCESS) return GENERIC_ERROR;
+		glAttachShader(program, vertexShader);
+		glLinkProgram(program);
+		glDeleteShader(vertexShader);
+		return SUCCESS;
+	}
+
+	ErrCode attachVertexShader(const char* filename){
+		glDetachShader(program, vertexShader);
+		if(ErrCheck(loadShader(vertexShader, GL_VERTEX_SHADER, filename), "Vertex Shader laden") != SUCCESS) return GENERIC_ERROR;
+		glAttachShader(program, vertexShader);
+		glLinkProgram(program);
+		glDeleteShader(vertexShader);
+		return SUCCESS;
+	}
+
+	ErrCode attachFragmentShader(const char* code, const DWORD code_length){
+		glDetachShader(program, fragmentShader);
+		if(ErrCheck(loadShader(fragmentShader, GL_FRAGMENT_SHADER, code, code_length), "Fragment Shader laden") != SUCCESS) return GENERIC_ERROR;
+		glAttachShader(program, fragmentShader);
+		glLinkProgram(program);
+		glDeleteShader(fragmentShader);
+		return SUCCESS;
+	}
+
+	ErrCode attachFragmentShader(const char* filename){
+		glDetachShader(program, fragmentShader);
+		if(ErrCheck(loadShader(fragmentShader, GL_FRAGMENT_SHADER, filename), "Fragment Shader laden") != SUCCESS) return GENERIC_ERROR;
+		glAttachShader(program, fragmentShader);
+		glLinkProgram(program);
+		glDeleteShader(fragmentShader);
+		return SUCCESS;
+	}
+
+	void use(){
+		glUseProgram(program);
+	}
 };
+
+struct GBuffer{
+	//Framebuffer Objekt
+	GLuint framebuffer = 0;
+	//Texture Attachments
+	GLuint albedo = 0;
+	GLuint lighting = 0;
+	WORD width, height;
+
+	GBuffer(WORD width, WORD height) : width(width), height(height){
+		resize(width, height);
+		glGenFramebuffers(1, &framebuffer);
+		glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
+
+		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, albedo, 0);
+		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, lighting, 0);
+		GLenum attachments[] = {GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1};
+		glDrawBuffers(sizeof(attachments)/sizeof(GLenum), attachments);
+	}
+
+	~GBuffer(){
+		glDeleteTextures(1, &albedo);
+		glDeleteTextures(1, &lighting);
+		glDeleteFramebuffers(1, &framebuffer);
+	}
+
+	void bind(){
+		glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
+	}
+
+	void unbind(){
+		glBindFramebuffer(GL_FRAMEBUFFER, 0);
+	}
+
+	void resize(WORD width, WORD height){
+		glDeleteTextures(1, &albedo);
+		glDeleteTextures(1, &lighting);
+		glGenTextures(1, &albedo);
+		glGenTextures(1, &lighting);
+
+		glActiveTexture(GL_TEXTURE3);
+		glBindTexture(GL_TEXTURE_2D, albedo);
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+		glActiveTexture(GL_TEXTURE4);
+		glBindTexture(GL_TEXTURE_2D, lighting);
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+
+		bind();
+		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, albedo, 0);
+		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, lighting, 0);
+	}
+};
+
+GBuffer* globalGBufferRef = nullptr;
 
 void createSDFLevels(TriangleModel* models, DWORD modelCount, GLuint* texture, GLint dx, GLint dy, GLint dz){
     glGenTextures(2, texture);
@@ -81,6 +186,9 @@ INT WinMain(HINSTANCE hInstance, HINSTANCE hPreviousInst, LPSTR lpszCmdLine, int
     if(ErrCheck(createWindow(window, hInstance, 1000, 1000, 0, 0, 1, "Fenster", windowCallback), "Fenster öffnen") != SUCCESS) return -1;
     if(init() != SUCCESS) return -1;
 
+	GBuffer gBuffer(1000, 1000);
+	globalGBufferRef = &gBuffer;
+
     Font font;
     if(ErrCheck(loadTTF(font, "fonts/OpenSans-Bold.ttf"), "Font laden") != SUCCESS) return -1;
 
@@ -88,7 +196,7 @@ INT WinMain(HINSTANCE hInstance, HINSTANCE hPreviousInst, LPSTR lpszCmdLine, int
 
     Timer timer;
 
-    GLint program = glCreateProgram();
+    GLProgram primaryRaymarchProgram;
     const GLchar vertexShaderCode[] = 
 	"#version 330\n"
 	"layout(location=0) in vec2 pos;"
@@ -96,16 +204,12 @@ INT WinMain(HINSTANCE hInstance, HINSTANCE hPreviousInst, LPSTR lpszCmdLine, int
 	"   gl_Position = vec4(pos, 0.0, 1.0);"
 	"}";
 
-    GLuint vertexShader = 0;
-    GLuint fragmentShader = 0;
-	GLuint geometryShader = 0;
-    if(ErrCheck(loadShader(vertexShader, GL_VERTEX_SHADER, vertexShaderCode, sizeof(vertexShaderCode)), "Vertex Shader laden") != SUCCESS) return GENERIC_ERROR;
-    if(ErrCheck(loadShader(fragmentShader, GL_FRAGMENT_SHADER, "raymarch.frag"), "Fragment Shader laden") != SUCCESS) return GENERIC_ERROR;
-    glAttachShader(program, vertexShader);
-	glAttachShader(program, fragmentShader);
-    glLinkProgram(program);
-    glDeleteShader(vertexShader);
-    glDeleteShader(fragmentShader);
+	if(primaryRaymarchProgram.attachVertexShader(vertexShaderCode, sizeof(vertexShaderCode)) != SUCCESS) return -1;
+	if(primaryRaymarchProgram.attachFragmentShader("raymarch.frag") != SUCCESS) return -1;
+
+	GLProgram finalProgram;
+	if(finalProgram.attachVertexShader(vertexShaderCode, sizeof(vertexShaderCode)) != SUCCESS) return -1;
+	if(finalProgram.attachFragmentShader("final.frag") != SUCCESS) return -1;
 
 	TriangleModel models[50];
 	for(DWORD i=0; i < sizeof(models)/sizeof(TriangleModel); ++i) models[i].attributesCount = 8;
@@ -133,7 +237,7 @@ INT WinMain(HINSTANCE hInstance, HINSTANCE hPreviousInst, LPSTR lpszCmdLine, int
 	float dy = modelMax.y-modelMin.y;
 	float dz = modelMax.z-modelMin.z;
 	float totalVolume = dx*dy*dz;
-	float targetVolume = 1600*1000*1000;
+	float targetVolume = 1600*1000*100;
 	float scale = std::cbrtf(targetVolume/totalVolume);
 	GLint sdfSize[3] = {(GLint)(dx*scale), (GLint)(dy*scale), (GLint)(dz*scale)};
 	std::cout << sdfSize[0] << ", " << sdfSize[1] << ", " << sdfSize[2] << std::endl;
@@ -187,20 +291,26 @@ INT WinMain(HINSTANCE hInstance, HINSTANCE hPreviousInst, LPSTR lpszCmdLine, int
         if(getWindowFlag(window, WINDOW_CLOSE)) break;
         clearWindow(window);
 
-        glUseProgram(program);
+        primaryRaymarchProgram.use();
         glBindVertexArray(VertsVAO);
+		gBuffer.bind();
 
-        glActiveTexture(GL_TEXTURE1);
-        glBindTexture(GL_TEXTURE_3D, sdfTextures[0]);
-		glActiveTexture(GL_TEXTURE2);
-        glBindTexture(GL_TEXTURE_3D, sdfTextures[1]);
-		glUniform1i(glGetUniformLocation(program, "sdfData"), 1);
-		glUniform1i(glGetUniformLocation(program, "sdfDataLow"), 2);
-        glUniformMatrix3fv(glGetUniformLocation(program, "camRot"), 1, false, rotM);
-        glUniform3f(glGetUniformLocation(program, "camPos"), camPos.x, camPos.y, camPos.z);
-        glUniform2f(glGetUniformLocation(program, "windowSize"), window.windowWidth, window.windowHeight);
-		glUniform3i(glGetUniformLocation(program, "sdfSize"), sdfSize[0], sdfSize[1], sdfSize[2]);
+		glUniform1i(glGetUniformLocation(primaryRaymarchProgram.program, "sdfData"), 1);
+		glUniform1i(glGetUniformLocation(primaryRaymarchProgram.program, "sdfDataLow"), 2);
+        glUniformMatrix3fv(glGetUniformLocation(primaryRaymarchProgram.program, "camRot"), 1, false, rotM);
+        glUniform3f(glGetUniformLocation(primaryRaymarchProgram.program, "camPos"), camPos.x, camPos.y, camPos.z);
+        glUniform2f(glGetUniformLocation(primaryRaymarchProgram.program, "windowSize"), window.windowWidth, window.windowHeight);
+		glUniform3i(glGetUniformLocation(primaryRaymarchProgram.program, "sdfSize"), sdfSize[0], sdfSize[1], sdfSize[2]);
         glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+
+		gBuffer.unbind();
+
+		finalProgram.use();
+
+		glUniform1i(glGetUniformLocation(finalProgram.program, "albedo"), 3);
+		glUniform1i(glGetUniformLocation(finalProgram.program, "lighting"), 4);
+		glUniform2f(glGetUniformLocation(finalProgram.program, "windowSize"), window.windowWidth, window.windowHeight);
+		glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
 
 		float total = getTotalMemoryUsage();
 		const char* sizeNames[] = {"B", "KB", "MB", "GB"};
@@ -277,6 +387,7 @@ LRESULT CALLBACK windowCallback(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lPar
 			if(!width || !height) break;
 			ErrCheck(setWindowFlag(*window, WINDOW_RESIZE), "setzte resize Fensterstatus");
 			ErrCheck(resizeWindow(*window, width, height, 1), "Fenster skalieren");
+			if(globalGBufferRef) globalGBufferRef->resize(width, height);
 			break;
 		}
 		case WM_LBUTTONDOWN:{

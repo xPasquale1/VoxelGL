@@ -2,16 +2,18 @@
 
 precision highp float;
 
+#define PI 3.14159265359
+
 in vec4 gl_FragCoord;
 
 uniform vec3 camPos;
 uniform mat3 camRot;
 uniform sampler3D sdfData;
 uniform sampler3D sdfDataLow;
+layout(location = 0) out vec3 albedo;
+layout(location = 1) out vec4 lighting;
 uniform vec2 windowSize;
 uniform ivec3 sdfSize;
-
-out vec4 fragColor;
 
 //TODO Der ganze Code hat so viele "Fixes"...
 //Man sollte nicht per 0.0005 in den nächsten Voxel steppen, sondern einfach die Position zusätzlich als Mittelpunkt im Voxel speichern
@@ -56,9 +58,9 @@ float random(){
 
 vec3 randomHemisphereVector(vec3 normal){
     float rand = random();
-    float theta = 2. * 3.14159265359 * rand;
+    float theta = 2. * PI * rand;
     rand = random();
-    float phi = 2. * 3.14159265359 * rand;
+    float phi = 2. * PI * rand;
 
     float x = sin(theta) * cos(phi);
     float y = sin(theta) * sin(phi);
@@ -96,8 +98,8 @@ bool trace(vec3 position, vec3 dir, out vec3 hitPos, out vec3 normal, float maxL
     return false;
 }
 
-#define SSAO_SAMPLES 16
-#define GI_SAMPLES 8
+#define GI_SAMPLES 16
+#define GI_BOUNCES 2
 
 void main(){
     float aspect = float(windowSize.x)/float(windowSize.y);
@@ -111,8 +113,7 @@ void main(){
     vec3 hitPos;
     vec3 normal;
     if(trace(position, dir, hitPos, normal, 10000)){
-        vec3 sdfInfo = texelFetch(sdfData, ivec3(hitPos), 0).rgb;
-        fragColor = vec4(sdfInfo, 1);
+        albedo = texelFetch(sdfData, ivec3(hitPos), 0).rgb;
 
         vec3 reflPos = hitPos;
         vec3 reflDir = dir;
@@ -120,36 +121,29 @@ void main(){
         position = hitPos;
         dir = normalize(vec3(0.25, 1.0, 0.1));
         position += normal * 0.01;
-        if(trace(position, dir, hitPos, normal, 10000)) fragColor.rgb *= 0.2;
+        vec3 direct_light = vec3(0);
+        if(trace(position, dir, hitPos, normal, 10000)) direct_light = albedo * 0.0;
+        else direct_light = albedo * dot(normal, reflDir);
 
         rng_state = uint(fract(sin(dot(gl_FragCoord.xy/vec2(1920, 1080), vec2(12.9898, 78.233))) * 43758.5453123) * 1000.0);
-        // float amount = SSAO_SAMPLES;
-        // for(int i=0; i < SSAO_SAMPLES; ++i){
-        //     dir = randomHemisphereVector(reflNormal);
-        //     position = reflPos + reflNormal * 0.01;
-        //     if(trace(position, dir, hitPos, normal, 1000)) amount -= (10-length(hitPos - reflPos))*0.1;
-        // }
-        // amount /= SSAO_SAMPLES;
-        // fragColor.rgb *= amount;
 
-        // for(int i=0; i < GI_SAMPLES; ++i){
-        //     dir = = randomHemisphereVector(reflNormal);
-        //     position = reflPos + reflNormal * 0.01;
-        //     if(trace(position, dir, hitPos, normal, 1000)){
-
-        //     }
-        // }
-
-        if(dot(reflNormal, vec3(0, 1, 0)) < 0.98) return;
-        position = reflPos;
-        dir = reflect(reflDir, reflNormal);
-        position += reflNormal * 0.01;
-        if(trace(position, dir, hitPos, normal, 10000)){
-            sdfInfo = texelFetch(sdfData, ivec3(hitPos), 0).rgb;
-            fragColor.rgb = mix(fragColor.rgb, sdfInfo, 0.3);
+        vec3 indirect_light = vec3(0);
+        float irradiance = 0;
+        for(int i=0; i < GI_SAMPLES; ++i){
+            dir = randomHemisphereVector(reflNormal);
+            position = reflPos + reflNormal * 0.01;
+            if(trace(position, dir, hitPos, normal, 10000)){
+                position = hitPos + normal * 0.01;
+                dir = normalize(vec3(0.25, 1.0, 0.1));
+                if(!trace(position, dir, hitPos, normal, 10000)){
+                    indirect_light += dot(dir, reflNormal) * texelFetch(sdfData, ivec3(hitPos), 0).rgb;
+                }
+            }
         }
-        
+        indirect_light *= 2.0 / float(GI_SAMPLES) * albedo;
+
+        lighting.rgb = direct_light + indirect_light;
         return;
     }
-    fragColor = vec4(0, 0.3, 1.0, 1.0);
+    albedo = vec3(0, 0.3, 1.0);
 }

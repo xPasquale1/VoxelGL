@@ -9,7 +9,8 @@ in vec4 gl_FragCoord;
 uniform vec3 camPos;
 uniform mat3 camRot;
 uniform sampler3D sdfData;
-uniform sampler3D sdfDataLow;
+uniform sampler3D sdfData4;
+uniform sampler3D sdfData8;
 layout(location = 0) out vec3 albedo;
 layout(location = 1) out vec4 lighting;
 uniform vec2 windowSize;
@@ -73,77 +74,112 @@ vec3 randomHemisphereVector(vec3 normal){
     return randomVec;
 }
 
-bool trace(vec3 position, vec3 dir, out vec3 hitPos, out vec3 normal, float maxLength){
+vec3 cosineSampleHemisphere(vec3 normal){
+    float u1 = random();
+    float u2 = random();
+    
+    float r = sqrt(u1);
+    float theta = 2.0 * PI * u2;
+
+    float x = r * cos(theta);
+    float y = r * sin(theta);
+    float z = sqrt(1.0 - u1);
+
+    vec3 tangent = normalize(cross(normal, abs(normal.x) > 0.1 ? vec3(0,1,0) : vec3(1,0,0)));
+    vec3 bitangent = cross(normal, tangent);
+
+    return normalize(tangent * x + bitangent * y + normal * z);
+}
+
+struct HitData{
+    bool didHit;
+    vec3 color;
+    vec3 position;
+    vec3 normal;
+};
+
+HitData trace(vec3 position, vec3 dir, float maxLength){
     vec3 startPos = position;
+    vec3 normal = vec3(0);
+    HitData ret;
+    ret.didHit = false;
     for(int i=0; i < 512; ++i){
-        if(distance(startPos, position) > maxLength) return false;
-        if(any(lessThan(position, vec3(0))) || any(greaterThanEqual(position, vec3(sdfSize)))) return false;
-        ivec3 lowresBlock = ivec3(position/4);
-        vec4 sdfInfo = texelFetch(sdfDataLow, lowresBlock, 0);
-        if(sdfInfo.r > 0.1){
-            for(int j=0; j < 16; j++){
-                if(distance(startPos, position) > maxLength) return false;
-                if(ivec3(position/4) != lowresBlock) break;
-                sdfInfo = texelFetch(sdfData, ivec3(position), 0);
-                if(sdfInfo.a > 0.1){
-                    hitPos = position;
-                    return true;
+        if(distance(startPos, position) > maxLength) return ret;
+        if(any(lessThan(position, vec3(0))) || any(greaterThanEqual(position, vec3(sdfSize)))) return ret;
+        ivec3 lowresBlock8 = ivec3(position/8);
+        vec4 sdfInfo8 = texelFetch(sdfData8, lowresBlock8, 0);
+        if(sdfInfo8.r > 0.1){
+            for(int j=0; j < 64; ++j){
+                if(distance(startPos, position) > maxLength) return ret;
+                if(ivec3(position/8) != lowresBlock8) break;
+                ivec3 lowresBlock4 = ivec3(position/4);
+                vec4 sdfInfo4 = texelFetch(sdfData4, lowresBlock4, 0);
+                if(sdfInfo4.r > 0.1){
+                    for(int k=0; k < 16; k++){
+                        if(distance(startPos, position) > maxLength) return ret;
+                        if(ivec3(position/4) != lowresBlock4) break;
+                        vec4 sdfInfo = texelFetch(sdfData, ivec3(position), 0);
+                        if(sdfInfo.a > 0.1){
+                            ret.didHit = true;
+                            ret.color = sdfInfo.rgb;
+                            ret.position = position;
+                            ret.normal = normal;
+                            return ret;
+                        }
+                        position = intersect(position, dir, normal, 1.0);
+                    }
+                    continue;
                 }
-                position = intersect(position, dir, normal, 1.0);
+                position = intersect(position, dir, normal, 4.0);
             }
             continue;
         }
-        position = intersect(position, dir, normal, 4.0);
+        position = intersect(position, dir, normal, 8.0);
     }
-    return false;
+    return ret;
 }
 
 #define GI_SAMPLES 16
-#define GI_BOUNCES 2
+
+const vec3 sky_dir = normalize(vec3(0.25, 1.0, 0.1));
+const vec3 sky_color = vec3(0.53, 0.8, 0.92);
+
+vec3 direct_light = vec3(0);
+vec3 indirect_light = vec3(0);
 
 void main(){
     float aspect = float(windowSize.x)/float(windowSize.y);
     vec2 uv = gl_FragCoord.xy/windowSize*2.0-vec2(1.0);
     uv.x *= aspect;
-
-    vec3 position = camPos;
-    vec3 dir = normalize(vec3(uv, 1.5));
-    dir = camRot * dir;
     
-    vec3 hitPos;
-    vec3 normal;
-    if(trace(position, dir, hitPos, normal, 10000)){
-        albedo = texelFetch(sdfData, ivec3(hitPos), 0).rgb;
+    //Raycast in die Szene
+    HitData primary_hit_data = trace(camPos, camRot * normalize(vec3(uv, 1.5)), 10000);
+    if(primary_hit_data.didHit){
 
-        vec3 reflPos = hitPos;
-        vec3 reflDir = dir;
-        vec3 reflNormal = normal;
-        position = hitPos;
-        dir = normalize(vec3(0.25, 1.0, 0.1));
-        position += normal * 0.01;
-        vec3 direct_light = vec3(0);
-        if(trace(position, dir, hitPos, normal, 10000)) direct_light = albedo * 0.0;
-        else direct_light = albedo * dot(normal, reflDir);
+        //Direktes Licht
+        HitData direct_light_data = trace(primary_hit_data.position + primary_hit_data.normal * 0.01, sky_dir, 10000);
+        if(direct_light_data.didHit == false) direct_light = primary_hit_data.color * max(dot(primary_hit_data.normal, sky_dir), 0);
 
         rng_state = uint(fract(sin(dot(gl_FragCoord.xy/vec2(1920, 1080), vec2(12.9898, 78.233))) * 43758.5453123) * 1000.0);
 
-        vec3 indirect_light = vec3(0);
-        float irradiance = 0;
+        //GI
         for(int i=0; i < GI_SAMPLES; ++i){
-            dir = randomHemisphereVector(reflNormal);
-            position = reflPos + reflNormal * 0.01;
-            if(trace(position, dir, hitPos, normal, 10000)){
-                position = hitPos + normal * 0.01;
-                dir = normalize(vec3(0.25, 1.0, 0.1));
-                if(!trace(position, dir, hitPos, normal, 10000)){
-                    indirect_light += dot(dir, reflNormal) * texelFetch(sdfData, ivec3(hitPos), 0).rgb;
-                }
+            vec3 sample_direction = normalize(primary_hit_data.normal + normalize(vec3(random()*2-1, random()*2-1, random()*2-1)));
+            HitData gi_sample_data = trace(primary_hit_data.position + primary_hit_data.normal * 0.01, sample_direction, 10000);
+            if(gi_sample_data.didHit){
+                HitData gi_sample_direct_light_data = trace(gi_sample_data.position + gi_sample_data.normal * 0.01, sky_dir, 10000);
+                if(gi_sample_direct_light_data.didHit == false) indirect_light += gi_sample_data.color;
+            }else{
+                indirect_light += sky_color;
             }
         }
-        indirect_light *= 2.0 / float(GI_SAMPLES) * albedo;
+        indirect_light /= float(GI_SAMPLES);
 
-        lighting.rgb = direct_light + indirect_light;
+        // lighting.rgb = direct_light;
+        // lighting.rgb = indirect_light;
+        // lighting.rgb = direct_light + indirect_light;
+        lighting.rgb = primary_hit_data.color;
         return;
     }
-    albedo = vec3(0, 0.3, 1.0);
+    albedo = sky_color;
 }

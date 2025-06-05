@@ -109,7 +109,7 @@ struct GBuffer{
 		glGenTextures(1, &albedo);
 		glGenTextures(1, &lighting);
 
-		glActiveTexture(GL_TEXTURE3);
+		glActiveTexture(GL_TEXTURE4);
 		glBindTexture(GL_TEXTURE_2D, albedo);
 		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
@@ -127,7 +127,7 @@ struct GBuffer{
 GBuffer* globalGBufferRef = nullptr;
 
 void createSDFLevels(TriangleModel* models, DWORD modelCount, GLuint* texture, GLint dx, GLint dy, GLint dz){
-    glGenTextures(2, texture);
+    glGenTextures(3, texture);
 	glActiveTexture(GL_TEXTURE1);
     glBindTexture(GL_TEXTURE_3D, texture[0]);
 
@@ -146,13 +146,47 @@ void createSDFLevels(TriangleModel* models, DWORD modelCount, GLuint* texture, G
 
     glTexImage3D(GL_TEXTURE_3D, 0, GL_RGBA8, dx, dy, dz, 0, GL_BGRA, GL_UNSIGNED_BYTE, sdfData);
 	glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-	GLint mipdx = std::ceil((float)dx/4);
-	GLint mipdy = std::ceil((float)dy/4);
-	GLint mipdz = std::ceil((float)dz/4);
-	BYTE* sdfMipMap = alloc<BYTE>(mipdx*mipdy*mipdz, "SDF MipMap");
 
+	GLint mipdx4 = std::ceil((float)dx/4);
+	GLint mipdy4 = std::ceil((float)dy/4);
+	GLint mipdz4 = std::ceil((float)dz/4);
+	BYTE* sdfMipMap4 = alloc<BYTE>(mipdx4*mipdy4*mipdz4, "SDF MipMap4");
+
+	for(GLint i=0; i < mipdx4*mipdy4*mipdz4; ++i) sdfMipMap4[i] = 0;
+	for(GLint x=0; x < dx; ++x){
+		for(GLint y=0; y < dy; ++y){
+			for(GLint z=0; z < dz; ++z){
+				if(A(sdfData[z * dy * dx + y * dx + x]) > 0) sdfMipMap4[(z/4) * mipdy4 * mipdx4 + (y/4) * mipdx4 + (x/4)] = 255;
+			}
+		}
+	}
+	glActiveTexture(GL_TEXTURE2);
+	glBindTexture(GL_TEXTURE_3D, texture[1]);
+	glTexImage3D(GL_TEXTURE_3D, 0, GL_R8, mipdx4, mipdy4, mipdz4, 0, GL_RED, GL_UNSIGNED_BYTE, sdfMipMap4);
+    glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+
+	GLint mipdx8 = std::ceil((float)dx/8);
+	GLint mipdy8 = std::ceil((float)dy/8);
+	GLint mipdz8 = std::ceil((float)dz/8);
+	BYTE* sdfMipMap8 = alloc<BYTE>(mipdx8*mipdy8*mipdz8, "SDF MipMap8");
+
+	for(GLint i=0; i < mipdx8*mipdy8*mipdz8; ++i) sdfMipMap8[i] = 0;
+	// for(GLint x=0; x < dx; ++x){
+	// 	for(GLint y=0; y < dy; ++y){
+	// 		for(GLint z=0; z < dz; ++z){
+	// 			if(A(sdfData[z * dy * dx + y * dx + x]) > 0) sdfMipMap8[(z/8) * mipdy8 * mipdx8 + (y/8) * mipdx8 + (x/8)] = 255;
+	// 		}
+	// 	}
+	// }
+	glActiveTexture(GL_TEXTURE3);
+	glBindTexture(GL_TEXTURE_3D, texture[2]);
+	glTexImage3D(GL_TEXTURE_3D, 0, GL_R8, mipdx8, mipdy8, mipdz8, 0, GL_RED, GL_UNSIGNED_BYTE, sdfMipMap8);
+    glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+
+	//Speichernutzung ausgeben
 	float total = getMemoryUsageByTag("SDF Daten");
-	total += getMemoryUsageByTag("SDF MipMap");
+	total += getMemoryUsageByTag("SDF MipMap4");
+	total += getMemoryUsageByTag("SDF MipMap8");
 	const char* sizeNames[] = {"B", "KB", "MB", "GB"};
 	BYTE sizeNameIdx = 0;
 	while(total >= 1000){
@@ -163,21 +197,10 @@ void createSDFLevels(TriangleModel* models, DWORD modelCount, GLuint* texture, G
 	memoryText += floatToString(total);
 	memoryText += sizeNames[sizeNameIdx];
 	std::cout << memoryText << std::endl;
-
-	for(GLint i=0; i < mipdx*mipdy*mipdz; ++i) sdfMipMap[i] = 0;
-	for(GLint x=0; x < dx; ++x){
-		for(GLint y=0; y < dy; ++y){
-			for(GLint z=0; z < dz; ++z){
-				if(A(sdfData[z * dy * dx + y * dx + x]) > 0) sdfMipMap[(z/4) * mipdy * mipdx + (y/4) * mipdx + (x/4)] = 255;
-			}
-		}
-	}
-	glActiveTexture(GL_TEXTURE2);
-	glBindTexture(GL_TEXTURE_3D, texture[1]);
-	glTexImage3D(GL_TEXTURE_3D, 0, GL_R8, mipdx, mipdy, mipdz, 0, GL_RED, GL_UNSIGNED_BYTE, sdfMipMap);
-    glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+	//TODO Sollte natürlich deallokiert werden
 	// dealloc(sdfData);
-	// dealloc(sdfMipMap);
+	// dealloc(sdfMipMap4);
+	// dealloc(sdfMipMap8);
 }
 
 LRESULT CALLBACK windowCallback(HWND, UINT, WPARAM, LPARAM);
@@ -216,7 +239,7 @@ INT WinMain(HINSTANCE hInstance, HINSTANCE hPreviousInst, LPSTR lpszCmdLine, int
 	Material materials[50];
 	DWORD modelCount = 0;
 	DWORD materialCount = 0;
-	if(ErrCheck(loadObj("objects/sponza.obj", models, modelCount, materials, materialCount, 0, 0, 0, 0), "Modell laden") != SUCCESS) return -1;
+	if(ErrCheck(loadObj("objects/sponza.obj", models, modelCount, materials, materialCount, 0, 0, 0, 0, 1, 1, 1), "Modell laden") != SUCCESS) return -1;
 
 	fvec3 modelMin = {0};
 	fvec3 modelMax = {0};
@@ -243,7 +266,7 @@ INT WinMain(HINSTANCE hInstance, HINSTANCE hPreviousInst, LPSTR lpszCmdLine, int
 	std::cout << sdfSize[0] << ", " << sdfSize[1] << ", " << sdfSize[2] << std::endl;
 	std::cout << "Voxels: " << sdfSize[0]*sdfSize[1]*sdfSize[2] << std::endl;
 	camPos = {(float)sdfSize[0]/2, (float)sdfSize[1]/2, (float)sdfSize[2]/2};
-	GLuint sdfTextures[2];
+	GLuint sdfTextures[3];
 	createSDFLevels(models, modelCount, sdfTextures, sdfSize[0], sdfSize[1], sdfSize[2]);
 
     GLuint Verts, VertsVAO;
@@ -296,7 +319,8 @@ INT WinMain(HINSTANCE hInstance, HINSTANCE hPreviousInst, LPSTR lpszCmdLine, int
 		gBuffer.bind();
 
 		glUniform1i(glGetUniformLocation(primaryRaymarchProgram.program, "sdfData"), 1);
-		glUniform1i(glGetUniformLocation(primaryRaymarchProgram.program, "sdfDataLow"), 2);
+		glUniform1i(glGetUniformLocation(primaryRaymarchProgram.program, "sdfData4"), 2);
+		glUniform1i(glGetUniformLocation(primaryRaymarchProgram.program, "sdfData8"), 3);
         glUniformMatrix3fv(glGetUniformLocation(primaryRaymarchProgram.program, "camRot"), 1, false, rotM);
         glUniform3f(glGetUniformLocation(primaryRaymarchProgram.program, "camPos"), camPos.x, camPos.y, camPos.z);
         glUniform2f(glGetUniformLocation(primaryRaymarchProgram.program, "windowSize"), window.windowWidth, window.windowHeight);
@@ -304,11 +328,10 @@ INT WinMain(HINSTANCE hInstance, HINSTANCE hPreviousInst, LPSTR lpszCmdLine, int
         glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
 
 		gBuffer.unbind();
-
 		finalProgram.use();
 
-		glUniform1i(glGetUniformLocation(finalProgram.program, "albedo"), 3);
-		glUniform1i(glGetUniformLocation(finalProgram.program, "lighting"), 4);
+		glUniform1i(glGetUniformLocation(finalProgram.program, "albedo"), 4);
+		glUniform1i(glGetUniformLocation(finalProgram.program, "lighting"), 5);
 		glUniform2f(glGetUniformLocation(finalProgram.program, "windowSize"), window.windowWidth, window.windowHeight);
 		glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
 

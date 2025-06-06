@@ -163,6 +163,11 @@ void main(){
         rng_state = uint(fract(sin(dot(gl_FragCoord.xy/vec2(1920, 1080), vec2(12.9898, 78.233))) * 43758.5453123) * 1000.0);
 
         //GI
+        //BRDF und PDF und NdotL werden vernächlässigt, da:
+        //die Verteilung cosinus weighted ist -> daher kein NdotL nötig
+        //BRDF = albedo/PI
+        //PDF = 1/PI
+        //BRDF/PDF = albedo * PI/PI = albedo
         for(int i=0; i < GI_SAMPLES; ++i){
             vec3 sample_direction = normalize(primary_hit_data.normal + normalize(vec3(random()*2-1, random()*2-1, random()*2-1)));
             HitData gi_sample_data = trace(primary_hit_data.position + primary_hit_data.normal * 0.01, sample_direction, 10000);
@@ -173,6 +178,7 @@ void main(){
                 indirect_light += sky_color;
             }
         }
+        indirect_light *= primary_hit_data.color;
         indirect_light /= float(GI_SAMPLES);
 
         // lighting.rgb = direct_light;

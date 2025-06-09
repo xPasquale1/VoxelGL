@@ -109,11 +109,11 @@ struct GBuffer{
 		glGenTextures(1, &albedo);
 		glGenTextures(1, &lighting);
 
-		glActiveTexture(GL_TEXTURE4);
+		glActiveTexture(GL_TEXTURE5);
 		glBindTexture(GL_TEXTURE_2D, albedo);
 		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-		glActiveTexture(GL_TEXTURE5);
+		glActiveTexture(GL_TEXTURE6);
 		glBindTexture(GL_TEXTURE_2D, lighting);
 		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
@@ -330,8 +330,8 @@ INT WinMain(HINSTANCE hInstance, HINSTANCE hPreviousInst, LPSTR lpszCmdLine, int
 		gBuffer.unbind();
 		finalProgram.use();
 
-		glUniform1i(glGetUniformLocation(finalProgram.program, "albedo"), 4);
-		glUniform1i(glGetUniformLocation(finalProgram.program, "lighting"), 5);
+		glUniform1i(glGetUniformLocation(finalProgram.program, "albedo"), 5);
+		glUniform1i(glGetUniformLocation(finalProgram.program, "lighting"), 6);
 		glUniform2f(glGetUniformLocation(finalProgram.program, "windowSize"), window.windowWidth, window.windowHeight);
 		glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
 

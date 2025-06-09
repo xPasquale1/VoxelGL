@@ -5,6 +5,7 @@
 #include "obj.h"
 
 std::vector<CharData> chars;
+std::vector<RectangleData> rectangles;
 
 fvec3 camPos = {0, 0, 0};
 float camRotX = 0;
@@ -15,6 +16,8 @@ float rotM[9]{
     0, 0, 1,
 };
 bool menuOpen = true;
+
+Checkbox checkboxes[1];
 
 struct GLProgram{
 	GLuint program = 0;
@@ -239,7 +242,7 @@ INT WinMain(HINSTANCE hInstance, HINSTANCE hPreviousInst, LPSTR lpszCmdLine, int
 	Material materials[100];
 	DWORD modelCount = 0;
 	DWORD materialCount = 0;
-	if(ErrCheck(loadObj("objects/classroom_no_blinds.obj", models, modelCount, materials, materialCount, 0, 0, 0, 0, 1, 1, 1), "Modell laden") != SUCCESS) return -1;
+	if(ErrCheck(loadObj("objects/room.obj", models, modelCount, materials, materialCount, 0, 0, 0, 0, -1, 1, 1), "Modell laden") != SUCCESS) return -1;
 
 	fvec3 modelMin = {0};
 	fvec3 modelMax = {0};
@@ -308,6 +311,10 @@ INT WinMain(HINSTANCE hInstance, HINSTANCE hPreviousInst, LPSTR lpszCmdLine, int
     std::string fpsText = "FPS: 0";
 	std::string msText = "0ms";
 
+	checkboxes[0].pos = {10, (WORD)(25+font.pixelSize*4)};
+	checkboxes[0].size = {32, 32};
+	checkboxes[0].label = "GI";
+
     while(1){
         resetTimer(timer);
         getMessages(window);
@@ -321,6 +328,7 @@ INT WinMain(HINSTANCE hInstance, HINSTANCE hPreviousInst, LPSTR lpszCmdLine, int
 		glUniform1i(glGetUniformLocation(primaryRaymarchProgram.program, "sdfData"), 1);
 		glUniform1i(glGetUniformLocation(primaryRaymarchProgram.program, "sdfData4"), 2);
 		glUniform1i(glGetUniformLocation(primaryRaymarchProgram.program, "sdfData8"), 3);
+		glUniform1i(glGetUniformLocation(primaryRaymarchProgram.program, "gi_enabled"), getCheckBoxFlag(checkboxes[0], CHECKBOXFLAG_CHECKED));
         glUniformMatrix3fv(glGetUniformLocation(primaryRaymarchProgram.program, "camRot"), 1, false, rotM);
         glUniform3f(glGetUniformLocation(primaryRaymarchProgram.program, "camPos"), camPos.x, camPos.y, camPos.z);
         glUniform2f(glGetUniformLocation(primaryRaymarchProgram.program, "windowSize"), window.windowWidth, window.windowHeight);
@@ -348,13 +356,18 @@ INT WinMain(HINSTANCE hInstance, HINSTANCE hPreviousInst, LPSTR lpszCmdLine, int
         drawFontString(window, font, chars, fpsText.c_str(), 10, 10);
 		drawFontString(window, font, chars, msText.c_str(), 10, 15+font.pixelSize);
 		drawFontString(window, font, chars, memoryText.c_str(), 10, 20+font.pixelSize*2);
+		
+		if(menuOpen) updateCheckBoxes(window, font, checkboxes, sizeof(checkboxes)/sizeof(Checkbox), rectangles, chars);
 
+		renderRectangles(window, rectangles.data(), rectangles.size());
         renderFontChars(window, font, chars.data(), chars.size());
         drawWindow(window);
         timeTaken = getTimerMicros(timer);
         fpsText = "FPS: " + std::string(longToString(1000000/timeTaken));
 		msText = floatToString(timeTaken/1000.f) + " ms";
-        chars.clear();
+        rectangles.clear();
+		chars.clear();
+
 
         if(getButton(mouse, MOUSE_LMB)) setButton(mouse, MOUSE_PREV_LMB);
         else resetButton(mouse, MOUSE_PREV_LMB);

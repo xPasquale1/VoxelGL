@@ -6,6 +6,7 @@ precision highp float;
 
 in vec4 gl_FragCoord;
 
+uniform int gi_enabled;
 uniform vec3 camPos;
 uniform mat3 camRot;
 uniform sampler3D sdfData;
@@ -159,30 +160,32 @@ void main(){
     HitData primary_hit_data = trace(camPos, camRot * normalize(vec3(uv, 1.5)));
     if(primary_hit_data.didHit){
 
-        // //Direktes Licht
+        //Direktes Licht
         HitData direct_light_data = trace(primary_hit_data.position + primary_hit_data.normal * 0.01, sky_dir);
         if(direct_light_data.didHit == false) direct_light = primary_hit_data.color * max(dot(primary_hit_data.normal, sky_dir), 0);
 
         rng_state = uint(fract(sin(dot(gl_FragCoord.xy/vec2(1920, 1080), vec2(12.9898, 78.233))) * 43758.5453123) * 1000.0);
 
-        // //GI
-        // //BRDF und PDF und NdotL werden vernächlässigt, da:
-        // //die Verteilung cosinus weighted ist -> daher kein NdotL nötig
-        // //BRDF = albedo/PI
-        // //PDF = 1/PI
-        // //BRDF/PDF = albedo * PI/PI = albedo
-        for(int i=0; i < GI_SAMPLES; ++i){
-            vec3 sample_direction = normalize(primary_hit_data.normal + normalize(vec3(random()*2-1, random()*2-1, random()*2-1)));
-            HitData gi_sample_data = trace(primary_hit_data.position + primary_hit_data.normal * 0.01, sample_direction);
-            if(gi_sample_data.didHit){
-                HitData gi_sample_direct_light_data = trace(gi_sample_data.position + gi_sample_data.normal * 0.01, sky_dir);
-                if(gi_sample_direct_light_data.didHit == false) indirect_light += gi_sample_data.color;
-            }else{
-                indirect_light += sky_color;
+        //GI
+        //BRDF und PDF und NdotL werden vernächlässigt, da:
+        //die Verteilung cosinus weighted ist -> daher kein NdotL nötig
+        //BRDF = albedo/PI
+        //PDF = 1/PI
+        //BRDF/PDF = albedo * PI/PI = albedo
+        if(gi_enabled > 0){
+            for(int i=0; i < GI_SAMPLES; ++i){
+                vec3 sample_direction = normalize(primary_hit_data.normal + normalize(vec3(random()*2-1, random()*2-1, random()*2-1)));
+                HitData gi_sample_data = trace(primary_hit_data.position + primary_hit_data.normal * 0.01, sample_direction);
+                if(gi_sample_data.didHit){
+                    HitData gi_sample_direct_light_data = trace(gi_sample_data.position + gi_sample_data.normal * 0.01, sky_dir);
+                    if(gi_sample_direct_light_data.didHit == false) indirect_light += gi_sample_data.color;
+                }else{
+                    indirect_light += sky_color;
+                }
             }
+            indirect_light *= primary_hit_data.color;
+            indirect_light /= float(GI_SAMPLES);
         }
-        indirect_light *= primary_hit_data.color;
-        indirect_light /= float(GI_SAMPLES);
 
         // lighting.rgb = direct_light;
         // lighting.rgb = indirect_light;

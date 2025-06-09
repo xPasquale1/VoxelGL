@@ -69,12 +69,10 @@ ErrCode splitString(const std::string& string, DWORD& value0, DWORD& value1, DWO
 		buffer[idx] += string[i];
 	}
 	if(idx < 2) return ERR_MODEL_BAD_FORMAT;
-	if(buffer[0].size() < 1) return ERR_MODEL_BAD_FORMAT;
-	if(buffer[1].size() < 1) return ERR_MODEL_BAD_FORMAT;
-	if(buffer[2].size() < 1) return ERR_MODEL_BAD_FORMAT;
-	value0 = std::stoul(buffer[0].c_str())-1;
-	value1 = std::stoul(buffer[1].c_str())-1;
-	value2 = std::stoul(buffer[2].c_str())-1;
+	//TODO Exeptions abfangen
+	value0 = (buffer[0].size() < 1) ? 0 : std::stoul(buffer[0].c_str())-1;
+	value1 = (buffer[1].size() < 1) ? 0 : std::stoul(buffer[1].c_str())-1;
+	value2 = (buffer[2].size() < 1) ? 0 : std::stoul(buffer[2].c_str())-1;
 	return SUCCESS;
 }
 
@@ -482,20 +480,26 @@ ErrCode loadObj(const char* filename, TriangleModel* models, DWORD& modelCount, 
 				models[modelIdx].triangles[triangleIdx].points[2] = points[pt_order[windingOrder[2]]];
 
 				DWORD attributeBaseIdx = triangleIdx*models[modelIdx].attributesCount*3;
-				models[modelIdx].attributesBuffer[attributeBaseIdx] = uvs[uv_order[windingOrder[0]]].x;
-				models[modelIdx].attributesBuffer[attributeBaseIdx+1] = uvs[uv_order[windingOrder[0]]].y;
+				if(uvs.size() > 0){
+					models[modelIdx].attributesBuffer[attributeBaseIdx] = uvs[uv_order[windingOrder[0]]].x;
+					models[modelIdx].attributesBuffer[attributeBaseIdx+1] = uvs[uv_order[windingOrder[0]]].y;
+				}
 				models[modelIdx].attributesBuffer[attributeBaseIdx+2] = normals[normal_order[windingOrder[0]]].x*-negSign(scaleX);
 				models[modelIdx].attributesBuffer[attributeBaseIdx+3] = normals[normal_order[windingOrder[0]]].y*-negSign(scaleY);	//TODO Warum müssen die negativ sein?
 				models[modelIdx].attributesBuffer[attributeBaseIdx+4] = normals[normal_order[windingOrder[0]]].z*-negSign(scaleZ);
 				attributeBaseIdx += models[modelIdx].attributesCount;
-				models[modelIdx].attributesBuffer[attributeBaseIdx] = uvs[uv_order[windingOrder[1]]].x;
-				models[modelIdx].attributesBuffer[attributeBaseIdx+1] = uvs[uv_order[windingOrder[1]]].y;
+				if(uvs.size() > 0){
+					models[modelIdx].attributesBuffer[attributeBaseIdx] = uvs[uv_order[windingOrder[1]]].x;
+					models[modelIdx].attributesBuffer[attributeBaseIdx+1] = uvs[uv_order[windingOrder[1]]].y;
+				}
 				models[modelIdx].attributesBuffer[attributeBaseIdx+2] = normals[normal_order[windingOrder[1]]].x*-negSign(scaleX);
 				models[modelIdx].attributesBuffer[attributeBaseIdx+3] = normals[normal_order[windingOrder[1]]].y*-negSign(scaleY);
 				models[modelIdx].attributesBuffer[attributeBaseIdx+4] = normals[normal_order[windingOrder[1]]].z*-negSign(scaleZ);
 				attributeBaseIdx += models[modelIdx].attributesCount;
-				models[modelIdx].attributesBuffer[attributeBaseIdx] = uvs[uv_order[windingOrder[2]]].x;
-				models[modelIdx].attributesBuffer[attributeBaseIdx+1] = uvs[uv_order[windingOrder[2]]].y;
+				if(uvs.size() > 0){
+					models[modelIdx].attributesBuffer[attributeBaseIdx] = uvs[uv_order[windingOrder[2]]].x;
+					models[modelIdx].attributesBuffer[attributeBaseIdx+1] = uvs[uv_order[windingOrder[2]]].y;
+				}
 				models[modelIdx].attributesBuffer[attributeBaseIdx+2] = normals[normal_order[windingOrder[2]]].x*-negSign(scaleX);
 				models[modelIdx].attributesBuffer[attributeBaseIdx+3] = normals[normal_order[windingOrder[2]]].y*-negSign(scaleY);
 				models[modelIdx].attributesBuffer[attributeBaseIdx+4] = normals[normal_order[windingOrder[2]]].z*-negSign(scaleZ);

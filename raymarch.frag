@@ -118,21 +118,21 @@ HitData trace(vec3 origin, vec3 dir){
         if(side_dist.x < side_dist.y && side_dist.x < side_dist.z){
             tmin = side_dist.x;
             voxel_pos.x += step_dir.x * scale;
-            normal = vec3(-step_dir.x, 0, 0);
+            normal = vec3(-step_dir_f.x, 0, 0);
             pos.x = sidePos.x + step_dir_f.x*0.0001;
             pos.y += tmin * dir.y;
             pos.z += tmin * dir.z;
         }else if(side_dist.y < side_dist.z){
             tmin = side_dist.y;
             voxel_pos.y += step_dir.y * scale;
-            normal = vec3(0, -step_dir.y, 0);
+            normal = vec3(0, -step_dir_f.y, 0);
             pos.x += tmin * dir.x;
             pos.y = sidePos.y + step_dir_f.y*0.0001;
             pos.z += tmin * dir.z;
         }else{
             tmin = side_dist.z;
             voxel_pos.z += step_dir.z * scale;
-            normal = vec3(0, 0, -step_dir.z);
+            normal = vec3(0, 0, -step_dir_f.z);
             pos.x += tmin * dir.x;
             pos.y += tmin * dir.y;
             pos.z = sidePos.z + step_dir_f.z*0.0001;
@@ -188,7 +188,6 @@ void main(){
         // lighting.rgb = indirect_light;
         lighting.rgb = direct_light + indirect_light + primary_hit_data.color * ambient;
         // lighting.rgb = primary_hit_data.color;
-        // lighting.rgb = vec3(float(sdf8_traces)/256., float(sdf4_traces)/256., float(sdf1_traces)/256.);
         return;
     }
     lighting.rgb = sky_color;

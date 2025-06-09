@@ -234,12 +234,12 @@ INT WinMain(HINSTANCE hInstance, HINSTANCE hPreviousInst, LPSTR lpszCmdLine, int
 	if(finalProgram.attachVertexShader(vertexShaderCode, sizeof(vertexShaderCode)) != SUCCESS) return -1;
 	if(finalProgram.attachFragmentShader("final.frag") != SUCCESS) return -1;
 
-	TriangleModel models[50];
+	TriangleModel models[200];
 	for(DWORD i=0; i < sizeof(models)/sizeof(TriangleModel); ++i) models[i].attributesCount = 8;
-	Material materials[50];
+	Material materials[100];
 	DWORD modelCount = 0;
 	DWORD materialCount = 0;
-	if(ErrCheck(loadObj("objects/sponza.obj", models, modelCount, materials, materialCount, 0, 0, 0, 0, 1, 1, 1), "Modell laden") != SUCCESS) return -1;
+	if(ErrCheck(loadObj("objects/classroom_no_blinds.obj", models, modelCount, materials, materialCount, 0, 0, 0, 0, 1, 1, 1), "Modell laden") != SUCCESS) return -1;
 
 	fvec3 modelMin = {0};
 	fvec3 modelMax = {0};

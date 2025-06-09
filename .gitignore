@@ -6,3 +6,8 @@ objects/classroom_low_poly.obj
 objects/forest0.obj
 objects/church.obj
 objects/church.mtl
+/textures/classroom
+objects/classroom.obj
+objects/classroom.mtl
+objects/classroom_no_blinds.mtl
+objects/classroom_no_blinds.obj

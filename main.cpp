@@ -260,7 +260,7 @@ INT WinMain(HINSTANCE hInstance, HINSTANCE hPreviousInst, LPSTR lpszCmdLine, int
 	DWORD modelCount = 0;
 	DWORD materialCount = 0;
 	resetTimer(timer);
-	if(ErrCheck(loadObj("objects/bistro.obj", models, modelCount, materials, materialCount, 0, 0, 0, 0, -1, 1, 1), "Modell laden") != SUCCESS) return -1;
+	if(ErrCheck(loadObj("objects/bistro_interior.obj", models, modelCount, materials, materialCount, 0, 0, 0, 0, -1, 1, 1), "Modell laden") != SUCCESS) return -1;
 	std::cout << "Modell laden: " << getTimerMillis(timer)/1000.f << "s" << std::endl;
 
 	fvec3 modelMin = {0};
@@ -282,7 +282,7 @@ INT WinMain(HINSTANCE hInstance, HINSTANCE hPreviousInst, LPSTR lpszCmdLine, int
 	float dy = modelMax.y-modelMin.y;
 	float dz = modelMax.z-modelMin.z;
 	float totalVolume = dx*dy*dz;
-	float targetVolume = 1600*1000*100;
+	float targetVolume = 1600*1000*1000;
 	float scale = std::cbrtf(targetVolume/totalVolume);
 	GLint sdfSize[3] = {(GLint)(dx*scale), (GLint)(dy*scale), (GLint)(dz*scale)};
 	std::cout << sdfSize[0] << ", " << sdfSize[1] << ", " << sdfSize[2] << std::endl;
@@ -295,30 +295,43 @@ INT WinMain(HINSTANCE hInstance, HINSTANCE hPreviousInst, LPSTR lpszCmdLine, int
 
 
 	//GI Probes berechnen und Speicher allokieren
-	float min_gi_probes = 80000;
+	float min_gi_probes = 8000;
 	float gi_probe_inv_scale = std::cbrtf((sdfSize[0]*sdfSize[1]*sdfSize[2])/min_gi_probes);
 	GLint gi_probes[3] = {GLint(std::ceil(sdfSize[0]/gi_probe_inv_scale)), GLint(std::ceil(sdfSize[1]/gi_probe_inv_scale)), GLint(std::ceil(sdfSize[2]/gi_probe_inv_scale))};
 	std::cout << "GI Probes: " << gi_probes[0] << ", " << gi_probes[1] << ", " << gi_probes[2] << " | " << gi_probes[0]*gi_probes[1]*gi_probes[2] << std::endl;
 
-	GLuint gi_probes_ssbo;
-	glGenBuffers(1, &gi_probes_ssbo);
-	glBindBuffer(GL_SHADER_STORAGE_BUFFER, gi_probes_ssbo);
+	GLuint gi_probes_ssbo[2];
+	glGenBuffers(2, gi_probes_ssbo);
+	glBindBuffer(GL_SHADER_STORAGE_BUFFER, gi_probes_ssbo[0]);
 	const int gi_probe_buffer_size = 4 * 6 * sizeof(float) * gi_probes[0]*gi_probes[1]*gi_probes[2];	//sizeof(vec3) * float[6] * sizeof(float) * Anzahl GI Probes
-	glBufferData(GL_SHADER_STORAGE_BUFFER, gi_probe_buffer_size, NULL, GL_STATIC_DRAW);
-	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, gi_probes_ssbo);
+	float* tmpBuffer = alloc<float>(gi_probe_buffer_size/sizeof(float), "tmp gi probes buffer init data");
+	for(int i=0; i < gi_probe_buffer_size/sizeof(float); ++i) tmpBuffer[i] = 0;
+	glBufferData(GL_SHADER_STORAGE_BUFFER, gi_probe_buffer_size, tmpBuffer, GL_STATIC_DRAW);
+	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, gi_probes_ssbo[0]);
+
+	glBindBuffer(GL_SHADER_STORAGE_BUFFER, gi_probes_ssbo[1]);
+	glBufferData(GL_SHADER_STORAGE_BUFFER, gi_probe_buffer_size, tmpBuffer, GL_STATIC_DRAW);
+	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, gi_probes_ssbo[1]);
+	dealloc(tmpBuffer);
 
 	GLProgram compute_gi_probes_program;
 	if(compute_gi_probes_program.attachComputeShader("compute_shaders/calculate_probe_lighting.glsl") != SUCCESS) return -1;
 
-	compute_gi_probes_program.use();
-	GLuint numGroups = std::ceil((gi_probes[0] * gi_probes[1] * gi_probes[2]) / 256.f);
-	std::cout << "GI Compute Groups: " << numGroups << std::endl;
-	glUniform1i(glGetUniformLocation(compute_gi_probes_program.program, "sdfData"), 1);
-	glUniform1i(glGetUniformLocation(compute_gi_probes_program.program, "sdfData4"), 2);
-	glUniform3i(glGetUniformLocation(compute_gi_probes_program.program, "sdfSize"), sdfSize[0], sdfSize[1], sdfSize[2]);
-	glUniform3i(glGetUniformLocation(compute_gi_probes_program.program, "gi_probe_size"), gi_probes[0], gi_probes[1], gi_probes[2]);
-	glDispatchCompute(numGroups, 1, 1);
-	glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
+	for(int i=0; i < 4; ++i){
+		resetTimer(timer);
+		glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, gi_probes_ssbo[i%2]);
+		glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, gi_probes_ssbo[(i+1)%2]);
+		compute_gi_probes_program.use();
+		GLuint numGroups = std::ceil((gi_probes[0] * gi_probes[1] * gi_probes[2]) / 256.f);
+		std::cout << "GI Compute Groups: " << numGroups << std::endl;
+		glUniform1i(glGetUniformLocation(compute_gi_probes_program.program, "sdfData"), 1);
+		glUniform1i(glGetUniformLocation(compute_gi_probes_program.program, "sdfData4"), 2);
+		glUniform3i(glGetUniformLocation(compute_gi_probes_program.program, "sdfSize"), sdfSize[0], sdfSize[1], sdfSize[2]);
+		glUniform3i(glGetUniformLocation(compute_gi_probes_program.program, "gi_probe_size"), gi_probes[0], gi_probes[1], gi_probes[2]);
+		glDispatchCompute(numGroups, 1, 1);
+		glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
+		std::cout << "GI-Probes berechnen: " << getTimerMillis(timer) << "ms" << std::endl;
+	}
 
 
 	//Vertex Array erstellen um ein Quad zu zeichnen
@@ -377,8 +390,6 @@ INT WinMain(HINSTANCE hInstance, HINSTANCE hPreviousInst, LPSTR lpszCmdLine, int
         primaryRaymarchProgram.use();
         glBindVertexArray(VertsVAO);
 		gBuffer.bind();
-
-		glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, gi_probes_ssbo);
 
 		glUniform1i(glGetUniformLocation(primaryRaymarchProgram.program, "sdfData"), 1);
 		glUniform1i(glGetUniformLocation(primaryRaymarchProgram.program, "sdfData4"), 2);

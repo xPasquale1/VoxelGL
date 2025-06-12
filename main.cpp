@@ -1,5 +1,4 @@
-#include "../OpenGL-Library/windowgl.h"
-#include "../OpenGL-Library/font.h"
+#include "windowgl.h"
 
 #define ACCURATEMESHTOVOXEL
 #include "obj.h"
@@ -17,12 +16,13 @@ float rotM[9]{
 };
 bool menuOpen = true;
 
-Checkbox checkboxes[1];
+Checkbox checkboxes[2];
 
 struct GLProgram{
 	GLuint program = 0;
 	GLuint vertexShader = 0;
 	GLuint fragmentShader = 0;
+	GLuint computeShader = 0;
 
 	GLProgram(){
 		program = glCreateProgram();
@@ -65,6 +65,24 @@ struct GLProgram{
 		glAttachShader(program, fragmentShader);
 		glLinkProgram(program);
 		glDeleteShader(fragmentShader);
+		return SUCCESS;
+	}
+
+	ErrCode attachComputeShader(const char* code, const DWORD code_length){
+		glDetachShader(program, computeShader);
+		if(ErrCheck(loadShader(computeShader, GL_COMPUTE_SHADER, code, code_length), "Compute Shader laden") != SUCCESS) return GENERIC_ERROR;
+		glAttachShader(program, computeShader);
+		glLinkProgram(program);
+		glDeleteShader(computeShader);
+		return SUCCESS;
+	}
+
+	ErrCode attachComputeShader(const char* filename){
+		glDetachShader(program, computeShader);
+		if(ErrCheck(loadShader(computeShader, GL_COMPUTE_SHADER, filename), "Compute Shader laden") != SUCCESS) return GENERIC_ERROR;
+		glAttachShader(program, computeShader);
+		glLinkProgram(program);
+		glDeleteShader(computeShader);
 		return SUCCESS;
 	}
 
@@ -210,7 +228,6 @@ LRESULT CALLBACK windowCallback(HWND, UINT, WPARAM, LPARAM);
 INT WinMain(HINSTANCE hInstance, HINSTANCE hPreviousInst, LPSTR lpszCmdLine, int nCmdShow){
 	Window window;
     if(ErrCheck(createWindow(window, hInstance, 1000, 1000, 0, 0, 1, "Fenster", windowCallback), "Fenster öffnen") != SUCCESS) return -1;
-    if(init() != SUCCESS) return -1;
 
 	GBuffer gBuffer(1000, 1000);
 	globalGBufferRef = &gBuffer;
@@ -237,12 +254,14 @@ INT WinMain(HINSTANCE hInstance, HINSTANCE hPreviousInst, LPSTR lpszCmdLine, int
 	if(finalProgram.attachVertexShader(vertexShaderCode, sizeof(vertexShaderCode)) != SUCCESS) return -1;
 	if(finalProgram.attachFragmentShader("final.frag") != SUCCESS) return -1;
 
-	TriangleModel models[200];
+	TriangleModel* models = alloc<TriangleModel>(3000, "Triangle-Models Buffer");
 	for(DWORD i=0; i < sizeof(models)/sizeof(TriangleModel); ++i) models[i].attributesCount = 8;
-	Material materials[100];
+	Material* materials = alloc<Material>(400, "Materials Buffer");
 	DWORD modelCount = 0;
 	DWORD materialCount = 0;
-	if(ErrCheck(loadObj("objects/room.obj", models, modelCount, materials, materialCount, 0, 0, 0, 0, -1, 1, 1), "Modell laden") != SUCCESS) return -1;
+	resetTimer(timer);
+	if(ErrCheck(loadObj("objects/bistro.obj", models, modelCount, materials, materialCount, 0, 0, 0, 0, -1, 1, 1), "Modell laden") != SUCCESS) return -1;
+	std::cout << "Modell laden: " << getTimerMillis(timer)/1000.f << "s" << std::endl;
 
 	fvec3 modelMin = {0};
 	fvec3 modelMax = {0};
@@ -270,8 +289,39 @@ INT WinMain(HINSTANCE hInstance, HINSTANCE hPreviousInst, LPSTR lpszCmdLine, int
 	std::cout << "Voxels: " << sdfSize[0]*sdfSize[1]*sdfSize[2] << std::endl;
 	camPos = {(float)sdfSize[0]/2, (float)sdfSize[1]/2, (float)sdfSize[2]/2};
 	GLuint sdfTextures[3];
+	resetTimer(timer);
 	createSDFLevels(models, modelCount, sdfTextures, sdfSize[0], sdfSize[1], sdfSize[2]);
+	std::cout << "Voxel Daten berechnen: " << getTimerMillis(timer)/1000.f << "s" << std::endl;
 
+
+	//GI Probes berechnen und Speicher allokieren
+	float min_gi_probes = 80000;
+	float gi_probe_inv_scale = std::cbrtf((sdfSize[0]*sdfSize[1]*sdfSize[2])/min_gi_probes);
+	GLint gi_probes[3] = {GLint(std::ceil(sdfSize[0]/gi_probe_inv_scale)), GLint(std::ceil(sdfSize[1]/gi_probe_inv_scale)), GLint(std::ceil(sdfSize[2]/gi_probe_inv_scale))};
+	std::cout << "GI Probes: " << gi_probes[0] << ", " << gi_probes[1] << ", " << gi_probes[2] << " | " << gi_probes[0]*gi_probes[1]*gi_probes[2] << std::endl;
+
+	GLuint gi_probes_ssbo;
+	glGenBuffers(1, &gi_probes_ssbo);
+	glBindBuffer(GL_SHADER_STORAGE_BUFFER, gi_probes_ssbo);
+	const int gi_probe_buffer_size = 4 * 6 * sizeof(float) * gi_probes[0]*gi_probes[1]*gi_probes[2];	//sizeof(vec3) * float[6] * sizeof(float) * Anzahl GI Probes
+	glBufferData(GL_SHADER_STORAGE_BUFFER, gi_probe_buffer_size, NULL, GL_STATIC_DRAW);
+	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, gi_probes_ssbo);
+
+	GLProgram compute_gi_probes_program;
+	if(compute_gi_probes_program.attachComputeShader("compute_shaders/calculate_probe_lighting.glsl") != SUCCESS) return -1;
+
+	compute_gi_probes_program.use();
+	GLuint numGroups = std::ceil((gi_probes[0] * gi_probes[1] * gi_probes[2]) / 256.f);
+	std::cout << "GI Compute Groups: " << numGroups << std::endl;
+	glUniform1i(glGetUniformLocation(compute_gi_probes_program.program, "sdfData"), 1);
+	glUniform1i(glGetUniformLocation(compute_gi_probes_program.program, "sdfData4"), 2);
+	glUniform3i(glGetUniformLocation(compute_gi_probes_program.program, "sdfSize"), sdfSize[0], sdfSize[1], sdfSize[2]);
+	glUniform3i(glGetUniformLocation(compute_gi_probes_program.program, "gi_probe_size"), gi_probes[0], gi_probes[1], gi_probes[2]);
+	glDispatchCompute(numGroups, 1, 1);
+	glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
+
+
+	//Vertex Array erstellen um ein Quad zu zeichnen
     GLuint Verts, VertsVAO;
     glGenVertexArrays(1, &VertsVAO);
     glGenBuffers(1, &Verts);
@@ -314,6 +364,9 @@ INT WinMain(HINSTANCE hInstance, HINSTANCE hPreviousInst, LPSTR lpszCmdLine, int
 	checkboxes[0].pos = {10, (WORD)(25+font.pixelSize*4)};
 	checkboxes[0].size = {32, 32};
 	checkboxes[0].label = "GI";
+	checkboxes[1].pos = {10, (WORD)(30+font.pixelSize*4+32)};
+	checkboxes[1].size = {32, 32};
+	checkboxes[1].label = "GI 2 Bounces";
 
     while(1){
         resetTimer(timer);
@@ -325,14 +378,17 @@ INT WinMain(HINSTANCE hInstance, HINSTANCE hPreviousInst, LPSTR lpszCmdLine, int
         glBindVertexArray(VertsVAO);
 		gBuffer.bind();
 
+		glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, gi_probes_ssbo);
+
 		glUniform1i(glGetUniformLocation(primaryRaymarchProgram.program, "sdfData"), 1);
 		glUniform1i(glGetUniformLocation(primaryRaymarchProgram.program, "sdfData4"), 2);
-		glUniform1i(glGetUniformLocation(primaryRaymarchProgram.program, "sdfData8"), 3);
 		glUniform1i(glGetUniformLocation(primaryRaymarchProgram.program, "gi_enabled"), getCheckBoxFlag(checkboxes[0], CHECKBOXFLAG_CHECKED));
+		glUniform1i(glGetUniformLocation(primaryRaymarchProgram.program, "gi_second_bounce"), getCheckBoxFlag(checkboxes[1], CHECKBOXFLAG_CHECKED));
         glUniformMatrix3fv(glGetUniformLocation(primaryRaymarchProgram.program, "camRot"), 1, false, rotM);
         glUniform3f(glGetUniformLocation(primaryRaymarchProgram.program, "camPos"), camPos.x, camPos.y, camPos.z);
         glUniform2f(glGetUniformLocation(primaryRaymarchProgram.program, "windowSize"), window.windowWidth, window.windowHeight);
 		glUniform3i(glGetUniformLocation(primaryRaymarchProgram.program, "sdfSize"), sdfSize[0], sdfSize[1], sdfSize[2]);
+		glUniform3i(glGetUniformLocation(primaryRaymarchProgram.program, "gi_probe_size"), gi_probes[0], gi_probes[1], gi_probes[2]);
         glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
 
 		gBuffer.unbind();

@@ -3,11 +3,12 @@ das erste cluster beim spieler hat genau diese auflösung.
 die nächsten 8 cluster drum herum haben nur noch eine auflösung von 128x128x128
 die nächsten darum haben 64x64x64 und alle weiteren auch
 Vorteile:
-(vielleicht sogar 512x512x512 -> 536MB)
-256x256x256     -> 67MB
-128x128x128 * 8 -> 67MB
-64x64x64 * 16   -> 16MB
-64x64x64 * 32   -> 33MB
+512x512x512 * 1  -> 536MB
+256x256x256 * 26 -> 436MB
+128x128x128 * 98 -> 205MB
+64x64x64 * 218   -> 57MB
+32x32x32 * 386   -> 13MB
+16x16x16 * 602   -> 2MB
 etc.
 Deutlich weniger Speicher und Details weiter weg sieht man eh nicht mehr so gut
 Hoffentlich bessere Raytracing Performance
@@ -20,3 +21,8 @@ Wahrscheinlich muss das mit mehreren 3D Texturen umgesetzt werden
 Anstatt per Pixel Lighting zu haben sollte man per Voxel Lighting machen
 Umsetzung per Raymarching über jeden Pixel (in einem compute shader) und dann speichern der getroffenen
 Position in einer Hashmap, dann hat man nur eine Liste aller getroffenen Positionen
+
+Hashmap ist einfach ein Array der den Index in das Voxel Volumen speichert. Zusätzlich das face das getroffenen
+worden ist. 6 Faces gibt es zwar nur, muss aber dennoch als uint32_t gespeichert werden, da es nicht kleiner geht...
+Index ist aktuell auch noch eine uint32_t Zahl, muss aber mit einer zweiten auf 64 bit erweitert werden. Vllt kann
+man da einfach die letzen 3 bit als face index nutzen.

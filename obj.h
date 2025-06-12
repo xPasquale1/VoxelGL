@@ -1,4 +1,4 @@
-#include "../OpenGL-Library/windowgl.h"
+#include "windowgl.h"
 
 //TODO vllt weg? Oder zumindest passender benennen wie TriangleVertexPositions oder so
 struct Triangle{
@@ -109,6 +109,7 @@ enum MTLKEYWORD{	//TODO hier fehlen noch ein paar
 	MTL_MAP_KA = hashKeywords("map_Ka"),		//AO
 	MTL_MAP_KS = hashKeywords("map_Ks"),		//Specular
 	MTL_MAP_D = hashKeywords("map_d"),			//TODO Keine Ahnung eine MTL File hat das als map_Kd genutzt
+	MTL_MAP_KE = hashKeywords("map_Ke"),
 	MTL_COMMENT = hashKeywords("#"),
 	MTL_KA = hashKeywords("Ka"),
 	MTL_KD = hashKeywords("Kd"),
@@ -272,9 +273,8 @@ ErrCode parseMtlLine(MTLKEYWORD key, std::fstream& file, void* outData)noexcept{
 			data[buffer.size()] = '\0';
 			break;
 		}
-		case MTL_MAP_BUMP:{
-			break;
-		}
+		case MTL_MAP_BUMP:
+		case MTL_MAP_KE:
 		case MTL_MAP_D:
 		case MTL_MAP_KD:
 		case MTL_MAP_KS:
@@ -317,9 +317,6 @@ ErrCode loadMtl(const char* filename, Material* materials, DWORD& materialCount)
 				materials[materialCount-1].name = std::string((char*)data);
 				break;
 			}
-			case MTL_MAP_BUMP:{
-				break;
-			}
 			case MTL_MAP_D:		//Kein Plan ob das richtig ist
 			case MTL_MAP_KS:
 			case MTL_MAP_KD:{
@@ -346,6 +343,8 @@ ErrCode loadMtl(const char* filename, Material* materials, DWORD& materialCount)
 				}
 				else if(fileEnding == ".png"){
 					if(ErrCheck(loadPng(textureFile.c_str(), materials[materialCount-1].textures[textureIdx]), "Texture laden") != SUCCESS) return ErrCheck(ERR_MATERIAL_BAD_FORMAT, std::string(word + " in Zeile: " + longToString(lineNumber)).c_str());
+				}else{
+					ErrCheck(ERR_MATERIAL_BAD_FORMAT, std::string(std::string("Nicht unterstütztes Bildformat in Zeile: ") + longToString(lineNumber)).c_str());
 				}
 				flipImageVertically(materials[materialCount-1].textures[textureIdx]);	//TODO warum nur ist das nötig?
 				materials[materialCount-1].textureCount = 1;
@@ -397,7 +396,9 @@ ErrCode loadMtl(const char* filename, Material* materials, DWORD& materialCount)
 				materials[materialCount-1].baseColor = RGBA(values[0]*255, values[1]*255, values[2]*255);
 				break;
 			}
-			case MTL_NS:	//TODO müssen alle noch implementiert werden
+			case MTL_MAP_BUMP:	//TODO müssen alle noch implementiert werden
+			case MTL_MAP_KE:
+			case MTL_NS:
 			case MTL_MAP_KA:
 			case MTL_KA:
 			case MTL_KE:
@@ -422,7 +423,7 @@ ErrCode loadObj(const char* filename, TriangleModel* models, DWORD& modelCount, 
 	std::fstream file;
 	file.open(filename, std::ios::in);
 	if(!file.is_open()) return ERR_MODEL_NOT_FOUND;
-	if(models[0].attributesCount < 5) return SUCCESS;		//TODO Neue Fehlermeldung
+	if(models[0].attributesCount < 5) return GENERIC_ERROR;		//TODO Neue Fehlermeldung
 	std::string word;
 	std::vector<fvec3> points;
 	std::vector<fvec3> normals;
@@ -525,7 +526,7 @@ ErrCode loadObj(const char* filename, TriangleModel* models, DWORD& modelCount, 
 				modelCount++;
 				if(!hasMaterial){
 					if(parseObjLine(key, file, data) != SUCCESS) return ErrCheck(ERR_MODEL_BAD_FORMAT, std::string(word + " in Zeile: " + longToString(lineNumber)).c_str());
-					ErrCheck(ERR_MODEL_BAD_FORMAT, std::string(word + " Material angefordert, Datei hat aber keins in Zeile: " + longToString(lineNumber)).c_str());
+					ErrCheck(ERR_MODEL_BAD_FORMAT, std::string(word + " Material angefordert, Datei hat aber keine Material Bibliothek in Zeile: " + longToString(lineNumber)).c_str());
 					break;
 				}
 				if(parseObjLine(key, file, data) != SUCCESS) return ErrCheck(ERR_MODEL_BAD_FORMAT, std::string(word + " in Zeile: " + longToString(lineNumber)).c_str());
@@ -697,7 +698,7 @@ void calculateSDFFromMesh(DWORD* sdfData, DWORD dx, DWORD dy, DWORD dz, Triangle
 						DistanceInfo dstInfo = pointToTriangleDistance(pos, model.triangles[j]);
 
 						#ifdef ACCURATEMESHTOVOXEL
-						if(dstInfo.distance < 0.2 && dstInfo.distance < marked[idx]){	//TODO < 0.2 ist nicht akkurat
+						if(dstInfo.distance < 0.2 && dstInfo.distance < marked[idx]){	//TODO < 0.2 ist nicht akkurat, ich tippe mal das kommt daher, dass die distance basierend auf der mesh größe relative zur sdf größe berechnet werden muss
 						#else
 						if(dstInfo.distance < 2.0 && dstInfo.distance < marked[idx]){	//TODO < 2.0 ist nicht akkurat
 						#endif
@@ -709,7 +710,8 @@ void calculateSDFFromMesh(DWORD* sdfData, DWORD dx, DWORD dy, DWORD dz, Triangle
 							float v3 = model.attributesBuffer[j*model.attributesCount*3+model.attributesCount*2+1];
 							float u = dstInfo.u * u1 + dstInfo.v * u2 + dstInfo.w * u3;
 							float v = dstInfo.u * v1 + dstInfo.v * v2 + dstInfo.w * v3;
-							sdfData[idx] = textureRepeated(model.material->textures[0], u, v);
+							if(model.material) sdfData[idx] = textureRepeated(model.material->textures[0], u, v);
+							else sdfData[idx] = RGBA(255, 255, 255, 255);
 							marked[idx] = dstInfo.distance;
 						}
 					}

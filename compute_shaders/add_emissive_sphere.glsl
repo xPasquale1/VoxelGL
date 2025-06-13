@@ -96,7 +96,18 @@ void main(){
     //Raycast in die Szene
     HitData primary_hit_data = trace(camPos, camRot * vec3(0, 0, 1));
     if(primary_hit_data.didHit){
-        imageStore(sdfData, ivec3(primary_hit_data.position), vec4(1, 1, 1, 1));
-        imageStore(sdfData4, ivec3(primary_hit_data.position)/4, 1);
+        ivec3 place_position = ivec3(primary_hit_data.position + primary_hit_data.normal*0.5);
+        for(int z=-6; z <= 6; ++z){
+            for(int y=-6; y <= 6; ++y){
+                for(int x=-6; x < 6; ++x){
+                    ivec3 pos = place_position + ivec3(x, y, z);
+                    if(any(lessThan(pos, ivec3(0))) || any(greaterThanEqual(pos, ivec3(sdfSize)))) continue;
+                    if(distance(pos, place_position) <= 6){
+                        imageStore(sdfData, pos, uvec4(255, 255, 255, 255));
+                        imageStore(sdfData4, pos/4, uvec4(1, 1, 1, 1));
+                    }
+                }
+            }
+        }
     }
 }

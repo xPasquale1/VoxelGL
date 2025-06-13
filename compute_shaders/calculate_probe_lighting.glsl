@@ -45,7 +45,7 @@ vec3 randomHemisphereVector(vec3 normal){
 
 struct HitData{
     bool didHit;
-    vec3 color;
+    vec4 color;
     vec3 position;
     vec3 normal;
 };
@@ -89,7 +89,7 @@ HitData trace(vec3 origin, vec3 dir){
             uvec4 sdf_data = imageLoad(sdfData, voxel_pos);
             if(sdf_data.a > 0){
                 ret.didHit = true;
-                ret.color = vec3(sdf_data.rgb)/255.0;
+                ret.color = vec4(sdf_data)/255.0;
                 ret.position = pos;
                 ret.normal = normal;
                 return ret;
@@ -167,7 +167,7 @@ HitData traceMax(vec3 origin, vec3 dir, float max_distance){
             uvec4 sdf_data = imageLoad(sdfData, voxel_pos);
             if(sdf_data.a > 0){
                 ret.didHit = true;
-                ret.color = vec3(sdf_data.rgb)/255.0;
+                ret.color = vec4(sdf_data)/255.0;
                 ret.position = pos;
                 ret.normal = normal;
                 return ret;
@@ -239,6 +239,11 @@ void main(){
             HitData gi_sample_data = trace(position, sample_direction);
             if(gi_sample_data.didHit){
 
+                if(gi_sample_data.color.a > 0.9){
+                    indirect_light += vec3(1);
+                    continue;
+                }
+
                 vec3 indirect_light_2 = vec3(0);
                 vec3 gi_grid_pos = (gi_sample_data.position / vec3(sdfSize)) * vec3(gi_probe_size) - 0.5;
                 ivec3 base = ivec3(floor(gi_grid_pos));
@@ -273,7 +278,7 @@ void main(){
                 indirect_light += indirect_light_2 * 0.8;   //TODO Faktor zum "ausklingen"?
 
                 HitData gi_sample_direct_light_data = trace(gi_sample_data.position + gi_sample_data.normal * 0.01, sky_dir);
-                if(gi_sample_direct_light_data.didHit == false) indirect_light += gi_sample_data.color * 2 * dot(dir, sample_direction);
+                if(gi_sample_direct_light_data.didHit == false) indirect_light += gi_sample_data.color.rgb * 2 * dot(dir, sample_direction);
             }else{
                 indirect_light += sky_color * 2 * dot(dir, sample_direction);
             }

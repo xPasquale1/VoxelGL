@@ -16,7 +16,7 @@ float rotM[9]{
 };
 bool menuOpen = true;
 
-Checkbox checkboxes[2];
+Checkbox checkboxes[3];
 
 struct GLProgram{
 	GLuint program = 0;
@@ -181,7 +181,6 @@ struct GPUTimer{
 };
 
 void createSDFLevels(TriangleModel* models, DWORD modelCount, GLuint* texture, GLint dx, GLint dy, GLint dz){
-	std::cout << glGetError() << std::endl;
     glGenTextures(3, texture);
     glBindTexture(GL_TEXTURE_3D, texture[0]);
 
@@ -198,10 +197,8 @@ void createSDFLevels(TriangleModel* models, DWORD modelCount, GLuint* texture, G
 	for(GLint y=0; y < dy; ++y) sdfData[0 * dy * dx + y * dx + (dx-1)] = RGBA(255, 255, 255, 128);
 	for(GLint y=0; y < dy; ++y) sdfData[(dz-1) * dy * dx + y * dx + (dx-1)] = RGBA(255, 255, 255, 128);
 
-	std::cout << dx << ", " << dy << ", " << dz << std::endl;
     glTexImage3D(GL_TEXTURE_3D, 0, GL_RGBA8UI, dx, dy, dz, 0, GL_BGRA_INTEGER, GL_UNSIGNED_BYTE, sdfData);
 	glBindImageTexture(1, texture[0], 0, GL_TRUE, 0, GL_READ_WRITE, GL_RGBA8UI);
-	glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
 	glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 
 	GLint mipdx4 = std::ceil((float)dx/4);
@@ -221,7 +218,6 @@ void createSDFLevels(TriangleModel* models, DWORD modelCount, GLuint* texture, G
 	glTexImage3D(GL_TEXTURE_3D, 0, GL_R8UI, mipdx4, mipdy4, mipdz4, 0, GL_RED_INTEGER, GL_UNSIGNED_BYTE, sdfMipMap4);
 	glBindImageTexture(2, texture[1], 0, GL_TRUE, 0, GL_READ_WRITE, GL_R8UI);
     glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-	std::cout << glGetError() << std::endl;
 
 	GLint mipdx8 = std::ceil((float)dx/8);
 	GLint mipdy8 = std::ceil((float)dy/8);
@@ -297,7 +293,7 @@ INT WinMain(HINSTANCE hInstance, HINSTANCE hPreviousInst, LPSTR lpszCmdLine, int
 	DWORD modelCount = 0;
 	DWORD materialCount = 0;
 	resetTimer(timer);
-	if(ErrCheck(loadObj("objects/sponza.obj", models, modelCount, materials, materialCount, 0, 0, 0, 0, -1, 1, 1), "Modell laden") != SUCCESS) return -1;
+	if(ErrCheck(loadObj("objects/bistro_interior.obj", models, modelCount, materials, materialCount, 0, 0, 0, 0, -1, 1, 1), "Modell laden") != SUCCESS) return -1;
 	std::cout << "Modell laden: " << getTimerMillis(timer)/1000.f << "s" << std::endl;
 
 	fvec3 modelMin = {0};
@@ -332,7 +328,7 @@ INT WinMain(HINSTANCE hInstance, HINSTANCE hPreviousInst, LPSTR lpszCmdLine, int
 
 
 	//GI Probes berechnen und Speicher allokieren
-	float min_gi_probes = 8000;
+	float min_gi_probes = 10000;
 	float gi_probe_inv_scale = std::cbrtf((sdfSize[0]*sdfSize[1]*sdfSize[2])/min_gi_probes);
 	GLint gi_probes[3] = {GLint(std::ceil(sdfSize[0]/gi_probe_inv_scale)), GLint(std::ceil(sdfSize[1]/gi_probe_inv_scale)), GLint(std::ceil(sdfSize[2]/gi_probe_inv_scale))};
 	std::cout << "GI Probes: " << gi_probes[0] << ", " << gi_probes[1] << ", " << gi_probes[2] << " | " << gi_probes[0]*gi_probes[1]*gi_probes[2] << std::endl;
@@ -371,6 +367,9 @@ INT WinMain(HINSTANCE hInstance, HINSTANCE hPreviousInst, LPSTR lpszCmdLine, int
 		std::cout << "GI-Probes berechnen: " << gpu_timer.getTimeMillis() << "ms" << std::endl;
 	}
 
+
+	GLProgram place_voxel_program;
+	if(place_voxel_program.attachComputeShader("compute_shaders/add_emissive_sphere.glsl") != SUCCESS) return -1;
 
 	//Vertex Array erstellen um ein Quad zu zeichnen
     GLuint Verts, VertsVAO;
@@ -415,15 +414,49 @@ INT WinMain(HINSTANCE hInstance, HINSTANCE hPreviousInst, LPSTR lpszCmdLine, int
 	checkboxes[0].pos = {10, (WORD)(25+font.pixelSize*4)};
 	checkboxes[0].size = {32, 32};
 	checkboxes[0].label = "GI";
-	checkboxes[1].pos = {10, (WORD)(30+font.pixelSize*4+32)};
+	checkboxes[1].pos = {10, (WORD)(30+font.pixelSize*4+checkboxes[0].size.y)};
 	checkboxes[1].size = {32, 32};
 	checkboxes[1].label = "GI 2 Bounces";
+	checkboxes[2].pos = {10, (WORD)(35+font.pixelSize*4+checkboxes[0].size.y*2)};
+	checkboxes[2].size = {32, 32};
+	checkboxes[2].label = "Rebuild GI";
 
     while(1){
         resetTimer(timer);
         getMessages(window);
         if(getWindowFlag(window, WINDOW_CLOSE)) break;
         clearWindow(window);
+
+		if(!menuOpen){
+			if(getButton(mouse, MOUSE_LMB) && !getButton(mouse, MOUSE_PREV_LMB)){
+				place_voxel_program.use();
+				glUniform1i(glGetUniformLocation(place_voxel_program.program, "sdfData"), 1);
+				glUniform1i(glGetUniformLocation(place_voxel_program.program, "sdfData4"), 2);
+				glUniform3i(glGetUniformLocation(place_voxel_program.program, "sdfSize"), sdfSize[0], sdfSize[1], sdfSize[2]);
+				glUniformMatrix3fv(glGetUniformLocation(place_voxel_program.program, "camRot"), 1, false, rotM);
+				glUniform3f(glGetUniformLocation(place_voxel_program.program, "camPos"), camPos.x, camPos.y, camPos.z);
+				glDispatchCompute(1, 1, 1);
+				glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
+			}
+		}
+
+		if(getCheckBoxFlag(checkboxes[2], CHECKBOXFLAG_CHECKED)){
+			resetCheckBoxFlag(checkboxes[2], CHECKBOXFLAG_CHECKED);
+			for(int i=0; i < 6; ++i){
+				gpu_timer.restart();
+				glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, gi_probes_ssbo[i%2]);
+				glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, gi_probes_ssbo[(i+1)%2]);
+				compute_gi_probes_program.use();
+				GLuint numGroups = std::ceil((gi_probes[0] * gi_probes[1] * gi_probes[2]) / 256.f);
+				glUniform1i(glGetUniformLocation(compute_gi_probes_program.program, "sdfData"), 1);
+				glUniform1i(glGetUniformLocation(compute_gi_probes_program.program, "sdfData4"), 2);
+				glUniform3i(glGetUniformLocation(compute_gi_probes_program.program, "sdfSize"), sdfSize[0], sdfSize[1], sdfSize[2]);
+				glUniform3i(glGetUniformLocation(compute_gi_probes_program.program, "gi_probe_size"), gi_probes[0], gi_probes[1], gi_probes[2]);
+				glDispatchCompute(numGroups, 1, 1);
+				glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
+				std::cout << "GI-Probes berechnen: " << gpu_timer.getTimeMillis() << "ms" << std::endl;
+			}
+		}
 
         primaryRaymarchProgram.use();
         glBindVertexArray(VertsVAO);

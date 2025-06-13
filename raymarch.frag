@@ -52,7 +52,7 @@ vec3 randomHemisphereVector(vec3 normal){
 
 struct HitData{
     bool didHit;
-    vec3 color;
+    vec4 color;
     vec3 position;
     vec3 normal;
 };
@@ -98,7 +98,7 @@ HitData trace(vec3 origin, vec3 dir){
             uvec4 sdf_data = imageLoad(sdfData, voxel_pos);
             if(sdf_data.a > 0){
                 ret.didHit = true;
-                ret.color = vec3(sdf_data.rgb)/255.0;
+                ret.color = vec4(sdf_data)/255.0;
                 ret.position = pos;
                 ret.normal = normal;
                 return ret;
@@ -176,7 +176,7 @@ HitData traceMax(vec3 origin, vec3 dir, float max_distance){
             uvec4 sdf_data = imageLoad(sdfData, voxel_pos);
             if(sdf_data.a > 0){
                 ret.didHit = true;
-                ret.color = vec3(sdf_data.rgb)/255.0;
+                ret.color = vec4(sdf_data)/255.0;
                 ret.position = pos;
                 ret.normal = normal;
                 return ret;
@@ -243,7 +243,7 @@ void main(){
 
         //Direktes Licht
         HitData direct_light_data = trace(primary_hit_data.position + primary_hit_data.normal * 0.01, sky_dir);
-        if(direct_light_data.didHit == false) direct_light = primary_hit_data.color * max(dot(primary_hit_data.normal, sky_dir), 0);
+        if(direct_light_data.didHit == false) direct_light = primary_hit_data.color.rgb * max(dot(primary_hit_data.normal, sky_dir), 0);
 
         rng_state = uint(fract(sin(dot(gl_FragCoord.xy/vec2(1920, 1080), vec2(12.9898, 78.233))) * 43758.5453123) * 1000.0);
 
@@ -259,14 +259,22 @@ void main(){
                 HitData gi_sample_data = trace(primary_hit_data.position + primary_hit_data.normal * 0.01, sample_direction);
                 if(gi_sample_data.didHit){
 
+                    if(gi_sample_data.color.a > 0.9){
+                        indirect_light += vec3(1);
+                        continue;
+                    }
                     if(gi_second_bounce > 0){
                         vec3 indirect_light_2 = vec3(0);
                         for(int i=0; i < GI_SAMPLES2; ++i){
                             vec3 sample_direction = normalize(gi_sample_data.normal + normalize(vec3(random()*2-1, random()*2-1, random()*2-1)));
                             HitData gi_2_sample_data = trace(gi_sample_data.position + gi_sample_data.normal * 0.01, sample_direction);
                             if(gi_2_sample_data.didHit){
+                                if(gi_2_sample_data.color.a > 0.9){
+                                    indirect_light_2 += vec3(1);
+                                    continue;
+                                }
                                 HitData gi_sample_2_direct_light_data = trace(gi_2_sample_data.position + gi_2_sample_data.normal * 0.01, sky_dir);
-                                if(gi_sample_2_direct_light_data.didHit == false) indirect_light_2 += gi_2_sample_data.color;
+                                if(gi_sample_2_direct_light_data.didHit == false) indirect_light_2 += gi_2_sample_data.color.rgb;
                             }else{
                                 indirect_light_2 += sky_color;
                             }
@@ -275,12 +283,12 @@ void main(){
                     }
 
                     HitData gi_sample_direct_light_data = trace(gi_sample_data.position + gi_sample_data.normal * 0.01, sky_dir);
-                    if(gi_sample_direct_light_data.didHit == false) indirect_light += gi_sample_data.color;
+                    if(gi_sample_direct_light_data.didHit == false) indirect_light += gi_sample_data.color.rgb;
                 }else{
                     indirect_light += sky_color;
                 }
             }
-            indirect_light *= primary_hit_data.color;
+            indirect_light *= primary_hit_data.color.rgb;
             indirect_light /= float(GI_SAMPLES);
         }else{
             vec3 gi_grid_pos = (primary_hit_data.position / vec3(sdfSize)) * vec3(gi_probe_size) - 0.5;
@@ -317,7 +325,7 @@ void main(){
 
         // lighting.rgb = direct_light;
         // lighting.rgb = indirect_light;
-        lighting.rgb = direct_light + indirect_light * primary_hit_data.color + primary_hit_data.color * ambient;
+        lighting.rgb = direct_light + indirect_light * primary_hit_data.color.rgb + primary_hit_data.color.rgb * ambient;
         // lighting.rgb = primary_hit_data.color;
         return;
     }

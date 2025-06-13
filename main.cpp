@@ -7,7 +7,7 @@ std::vector<CharData> chars;
 std::vector<RectangleData> rectangles;
 
 fvec3 camPos = {0, 0, 0};
-float camRotX = 0;
+float camRotX = PI/2;
 float camRotY = 0;
 float rotM[9]{
     1, 0, 0,
@@ -147,9 +147,42 @@ struct GBuffer{
 
 GBuffer* globalGBufferRef = nullptr;
 
+struct GPUTimer{
+	GLuint timer;
+	
+	GPUTimer(){glGenQueries(1, &timer);}
+	~GPUTimer(){glDeleteQueries(1, &timer);}
+
+	void restart(){glBeginQuery(GL_TIME_ELAPSED, timer);}
+	QWORD getTimeNanos(){
+		QWORD time_taken;
+		glEndQuery(GL_TIME_ELAPSED);
+		GLint available = 0;
+		while(!available) glGetQueryObjectiv(timer, GL_QUERY_RESULT_AVAILABLE, &available);
+		glGetQueryObjectui64v(timer, GL_QUERY_RESULT, &time_taken);
+		return time_taken;
+	}
+	QWORD getTimeMicros(){
+		QWORD time_taken;
+		glEndQuery(GL_TIME_ELAPSED);
+		GLint available = 0;
+		while(!available) glGetQueryObjectiv(timer, GL_QUERY_RESULT_AVAILABLE, &available);
+		glGetQueryObjectui64v(timer, GL_QUERY_RESULT, &time_taken);
+		return time_taken/1000;
+	}
+	QWORD getTimeMillis(){
+		QWORD time_taken;
+		glEndQuery(GL_TIME_ELAPSED);
+		GLint available = 0;
+		while(!available) glGetQueryObjectiv(timer, GL_QUERY_RESULT_AVAILABLE, &available);
+		glGetQueryObjectui64v(timer, GL_QUERY_RESULT, &time_taken);
+		return time_taken/1000000;
+	}
+};
+
 void createSDFLevels(TriangleModel* models, DWORD modelCount, GLuint* texture, GLint dx, GLint dy, GLint dz){
+	std::cout << glGetError() << std::endl;
     glGenTextures(3, texture);
-	glActiveTexture(GL_TEXTURE1);
     glBindTexture(GL_TEXTURE_3D, texture[0]);
 
 	glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
@@ -165,7 +198,10 @@ void createSDFLevels(TriangleModel* models, DWORD modelCount, GLuint* texture, G
 	for(GLint y=0; y < dy; ++y) sdfData[0 * dy * dx + y * dx + (dx-1)] = RGBA(255, 255, 255, 128);
 	for(GLint y=0; y < dy; ++y) sdfData[(dz-1) * dy * dx + y * dx + (dx-1)] = RGBA(255, 255, 255, 128);
 
-    glTexImage3D(GL_TEXTURE_3D, 0, GL_RGBA8, dx, dy, dz, 0, GL_BGRA, GL_UNSIGNED_BYTE, sdfData);
+	std::cout << dx << ", " << dy << ", " << dz << std::endl;
+    glTexImage3D(GL_TEXTURE_3D, 0, GL_RGBA8UI, dx, dy, dz, 0, GL_BGRA_INTEGER, GL_UNSIGNED_BYTE, sdfData);
+	glBindImageTexture(1, texture[0], 0, GL_TRUE, 0, GL_READ_WRITE, GL_RGBA8UI);
+	glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
 	glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 
 	GLint mipdx4 = std::ceil((float)dx/4);
@@ -181,10 +217,11 @@ void createSDFLevels(TriangleModel* models, DWORD modelCount, GLuint* texture, G
 			}
 		}
 	}
-	glActiveTexture(GL_TEXTURE2);
 	glBindTexture(GL_TEXTURE_3D, texture[1]);
-	glTexImage3D(GL_TEXTURE_3D, 0, GL_R8, mipdx4, mipdy4, mipdz4, 0, GL_RED, GL_UNSIGNED_BYTE, sdfMipMap4);
+	glTexImage3D(GL_TEXTURE_3D, 0, GL_R8UI, mipdx4, mipdy4, mipdz4, 0, GL_RED_INTEGER, GL_UNSIGNED_BYTE, sdfMipMap4);
+	glBindImageTexture(2, texture[1], 0, GL_TRUE, 0, GL_READ_WRITE, GL_R8UI);
     glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+	std::cout << glGetError() << std::endl;
 
 	GLint mipdx8 = std::ceil((float)dx/8);
 	GLint mipdy8 = std::ceil((float)dy/8);
@@ -260,7 +297,7 @@ INT WinMain(HINSTANCE hInstance, HINSTANCE hPreviousInst, LPSTR lpszCmdLine, int
 	DWORD modelCount = 0;
 	DWORD materialCount = 0;
 	resetTimer(timer);
-	if(ErrCheck(loadObj("objects/bistro_interior.obj", models, modelCount, materials, materialCount, 0, 0, 0, 0, -1, 1, 1), "Modell laden") != SUCCESS) return -1;
+	if(ErrCheck(loadObj("objects/sponza.obj", models, modelCount, materials, materialCount, 0, 0, 0, 0, -1, 1, 1), "Modell laden") != SUCCESS) return -1;
 	std::cout << "Modell laden: " << getTimerMillis(timer)/1000.f << "s" << std::endl;
 
 	fvec3 modelMin = {0};
@@ -282,7 +319,7 @@ INT WinMain(HINSTANCE hInstance, HINSTANCE hPreviousInst, LPSTR lpszCmdLine, int
 	float dy = modelMax.y-modelMin.y;
 	float dz = modelMax.z-modelMin.z;
 	float totalVolume = dx*dy*dz;
-	float targetVolume = 1600*1000*1000;
+	float targetVolume = 1600*1000*100;
 	float scale = std::cbrtf(targetVolume/totalVolume);
 	GLint sdfSize[3] = {(GLint)(dx*scale), (GLint)(dy*scale), (GLint)(dz*scale)};
 	std::cout << sdfSize[0] << ", " << sdfSize[1] << ", " << sdfSize[2] << std::endl;
@@ -317,8 +354,9 @@ INT WinMain(HINSTANCE hInstance, HINSTANCE hPreviousInst, LPSTR lpszCmdLine, int
 	GLProgram compute_gi_probes_program;
 	if(compute_gi_probes_program.attachComputeShader("compute_shaders/calculate_probe_lighting.glsl") != SUCCESS) return -1;
 
-	for(int i=0; i < 4; ++i){
-		resetTimer(timer);
+	GPUTimer gpu_timer;
+	for(int i=0; i < 6; ++i){
+		gpu_timer.restart();
 		glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, gi_probes_ssbo[i%2]);
 		glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, gi_probes_ssbo[(i+1)%2]);
 		compute_gi_probes_program.use();
@@ -330,7 +368,7 @@ INT WinMain(HINSTANCE hInstance, HINSTANCE hPreviousInst, LPSTR lpszCmdLine, int
 		glUniform3i(glGetUniformLocation(compute_gi_probes_program.program, "gi_probe_size"), gi_probes[0], gi_probes[1], gi_probes[2]);
 		glDispatchCompute(numGroups, 1, 1);
 		glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
-		std::cout << "GI-Probes berechnen: " << getTimerMillis(timer) << "ms" << std::endl;
+		std::cout << "GI-Probes berechnen: " << gpu_timer.getTimeMillis() << "ms" << std::endl;
 	}
 
 

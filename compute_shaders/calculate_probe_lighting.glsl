@@ -3,8 +3,8 @@
 #define PI 3.14159265359
 
 uniform ivec3 gi_probe_size;
-uniform sampler3D sdfData;
-uniform sampler3D sdfData4;
+layout(binding = 1, rgba8ui) uniform uimage3D sdfData;
+layout(binding = 2, r8ui) uniform uimage3D sdfData4;
 uniform ivec3 sdfSize;
 
 struct GIProbe{
@@ -74,8 +74,8 @@ HitData trace(vec3 origin, vec3 dir){
         if(any(lessThan(voxel_pos, ivec3(0))) || any(greaterThanEqual(voxel_pos, sdfSize))) return ret;
         if(scale == 4){
             block4 = voxel_pos/4;
-            float sdf_data = texelFetch(sdfData4, block4, 0).r;
-            if(sdf_data > 0.1){
+            uint sdf_data = imageLoad(sdfData4, block4).r;
+            if(sdf_data > 0){
                 scale = 1;
                 voxel_pos = ivec3(pos);
                 continue;
@@ -86,10 +86,10 @@ HitData trace(vec3 origin, vec3 dir){
                 voxel_pos = (voxel_pos>>2)<<2;
                 continue;
             }
-            vec4 sdf_data = texelFetch(sdfData, voxel_pos, 0);
-            if(sdf_data.a > 0.1){
+            uvec4 sdf_data = imageLoad(sdfData, voxel_pos);
+            if(sdf_data.a > 0){
                 ret.didHit = true;
-                ret.color = sdf_data.rgb;
+                ret.color = vec3(sdf_data.rgb)/255.0;
                 ret.position = pos;
                 ret.normal = normal;
                 return ret;
@@ -151,8 +151,8 @@ HitData traceMax(vec3 origin, vec3 dir, float max_distance){
         if(any(lessThan(voxel_pos, ivec3(0))) || any(greaterThanEqual(voxel_pos, sdfSize))) return ret;
         if(scale == 4){
             block4 = voxel_pos/4;
-            float sdf_data = texelFetch(sdfData4, block4, 0).r;
-            if(sdf_data > 0.1){
+            uint sdf_data = imageLoad(sdfData4, block4).r;
+            if(sdf_data > 0){
                 scale = 1;
                 voxel_pos = ivec3(pos);
                 continue;
@@ -164,10 +164,10 @@ HitData traceMax(vec3 origin, vec3 dir, float max_distance){
                 voxel_pos = (voxel_pos>>2)<<2;
                 continue;
             }
-            vec4 sdf_data = texelFetch(sdfData, voxel_pos, 0);
-            if(sdf_data.a > 0.1){
+            uvec4 sdf_data = imageLoad(sdfData, voxel_pos);
+            if(sdf_data.a > 0){
                 ret.didHit = true;
-                ret.color = sdf_data.rgb;
+                ret.color = vec3(sdf_data.rgb)/255.0;
                 ret.position = pos;
                 ret.normal = normal;
                 return ret;
@@ -204,7 +204,7 @@ HitData traceMax(vec3 origin, vec3 dir, float max_distance){
     return ret;
 }
 
-#define GI_SAMPLES 128
+#define GI_SAMPLES 32
 const vec3 directions[6] = vec3[6](
     vec3(1, 0, 0),
     vec3(-1, 0, 0),
@@ -266,11 +266,11 @@ void main(){
 
                     for(int d=0; d < 6; ++d){
                         float n_dot_dir = max(dot(gi_sample_data.normal, directions[d]), 0.0);
-                        indirect_light_2 += gi_data2[probe_idx].light[d].rgb * n_dot_dir * weight * 0.8;
+                        indirect_light_2 += gi_data2[probe_idx].light[d].rgb * n_dot_dir * weight;
                     }
                 }
                 if(total_weight > 0.0) indirect_light_2 /= total_weight;
-                indirect_light += indirect_light_2 * 0.95;   //TODO Faktor zum "ausklingen"?
+                indirect_light += indirect_light_2 * 0.8;   //TODO Faktor zum "ausklingen"?
 
                 HitData gi_sample_direct_light_data = trace(gi_sample_data.position + gi_sample_data.normal * 0.01, sky_dir);
                 if(gi_sample_direct_light_data.didHit == false) indirect_light += gi_sample_data.color * 2 * dot(dir, sample_direction);

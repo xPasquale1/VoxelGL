@@ -10,8 +10,8 @@ uniform int gi_enabled;
 uniform int gi_second_bounce;
 uniform vec3 camPos;
 uniform mat3 camRot;
-uniform sampler3D sdfData;
-uniform sampler3D sdfData4;
+layout(binding = 1, rgba8ui) uniform uimage3D sdfData;
+layout(binding = 2, r8ui) uniform uimage3D sdfData4;
 layout(location = 0) out vec3 albedo;
 layout(location = 1) out vec4 lighting;
 uniform vec2 windowSize;
@@ -83,8 +83,8 @@ HitData trace(vec3 origin, vec3 dir){
         if(any(lessThan(voxel_pos, ivec3(0))) || any(greaterThanEqual(voxel_pos, sdfSize))) return ret;
         if(scale == 4){
             block4 = voxel_pos/4;
-            float sdf_data = texelFetch(sdfData4, block4, 0).r;
-            if(sdf_data > 0.1){
+            uint sdf_data = imageLoad(sdfData4, block4).r;
+            if(sdf_data > 0){
                 scale = 1;
                 voxel_pos = ivec3(pos);
                 continue;
@@ -95,10 +95,10 @@ HitData trace(vec3 origin, vec3 dir){
                 voxel_pos = (voxel_pos>>2)<<2;
                 continue;
             }
-            vec4 sdf_data = texelFetch(sdfData, voxel_pos, 0);
-            if(sdf_data.a > 0.1){
+            uvec4 sdf_data = imageLoad(sdfData, voxel_pos);
+            if(sdf_data.a > 0){
                 ret.didHit = true;
-                ret.color = sdf_data.rgb;
+                ret.color = vec3(sdf_data.rgb)/255.0;
                 ret.position = pos;
                 ret.normal = normal;
                 return ret;
@@ -160,8 +160,8 @@ HitData traceMax(vec3 origin, vec3 dir, float max_distance){
         if(any(lessThan(voxel_pos, ivec3(0))) || any(greaterThanEqual(voxel_pos, sdfSize))) return ret;
         if(scale == 4){
             block4 = voxel_pos/4;
-            float sdf_data = texelFetch(sdfData4, block4, 0).r;
-            if(sdf_data > 0.1){
+            uint sdf_data = imageLoad(sdfData4, block4).r;
+            if(sdf_data > 0){
                 scale = 1;
                 voxel_pos = ivec3(pos);
                 continue;
@@ -173,10 +173,10 @@ HitData traceMax(vec3 origin, vec3 dir, float max_distance){
                 voxel_pos = (voxel_pos>>2)<<2;
                 continue;
             }
-            vec4 sdf_data = texelFetch(sdfData, voxel_pos, 0);
-            if(sdf_data.a > 0.1){
+            uvec4 sdf_data = imageLoad(sdfData, voxel_pos);
+            if(sdf_data.a > 0){
                 ret.didHit = true;
-                ret.color = sdf_data.rgb;
+                ret.color = vec3(sdf_data.rgb)/255.0;
                 ret.position = pos;
                 ret.normal = normal;
                 return ret;

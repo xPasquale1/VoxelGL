@@ -70,6 +70,7 @@ PFNGLBINDTEXTUREPROC glBindTexture;
 PFNGLBINDTEXTURESPROC glBindTextures;
 PFNGLTEXIMAGE2DPROC glTexImage2D;
 PFNGLTEXIMAGE3DPROC glTexImage3D;
+PFNGLTEXSUBIMAGE3DPROC glTexSubImage3D;
 PFNGLGENERATEMIPMAPPROC glGenerateMipmap;
 PFNGLTEXPARAMETERIPROC glTexParameteri;
 PFNGLTEXPARAMETERFVPROC glTexParameterfv;
@@ -97,6 +98,13 @@ PFNGLDELETEFRAMEBUFFERSPROC glDeleteFramebuffers;
 PFNGLFRAMEBUFFERTEXTURE2DPROC glFramebufferTexture2D;
 PFNGLFRAMEBUFFERTEXTURE3DPROC glFramebufferTexture3D;
 PFNGLDRAWBUFFERSPROC glDrawBuffers;
+PFNGLGENQUERIESPROC glGenQueries;
+PFNGLDELETEQUERIESPROC glDeleteQueries;
+PFNGLBEGINQUERYPROC glBeginQuery;
+PFNGLENDQUERYPROC glEndQuery;
+PFNGLGETQUERYOBJECTUI64VPROC glGetQueryObjectui64v;
+PFNGLGETQUERYOBJECTIVPROC glGetQueryObjectiv;
+PFNGLBINDIMAGETEXTUREPROC glBindImageTexture;
 
 bool _glInit = false;
 ErrCode initDrawLinesProgram()noexcept;
@@ -156,6 +164,7 @@ ErrCode _init()noexcept{
 	glBindTextures = (PFNGLBINDTEXTURESPROC)loadGlFunction("glBindTextures");
 	glTexImage2D = (PFNGLTEXIMAGE2DPROC)loadGlFunction("glTexImage2D");
 	glTexImage3D = (PFNGLTEXIMAGE3DPROC)loadGlFunction("glTexImage3D");
+	glTexSubImage3D = (PFNGLTEXSUBIMAGE3DPROC)loadGlFunction("glTexSubImage3D");
 	glGenerateMipmap = (PFNGLGENERATEMIPMAPPROC)loadGlFunction("glGenerateMipmap");
 	glTexParameteri = (PFNGLTEXPARAMETERIPROC)loadGlFunction("glTexParameteri");
 	glTexParameterfv = (PFNGLTEXPARAMETERFVPROC)loadGlFunction("glTexParameterfv");
@@ -183,6 +192,13 @@ ErrCode _init()noexcept{
 	glFramebufferTexture2D = (PFNGLFRAMEBUFFERTEXTURE2DPROC)loadGlFunction("glFramebufferTexture2D");
 	glFramebufferTexture3D = (PFNGLFRAMEBUFFERTEXTURE3DPROC)loadGlFunction("glFramebufferTexture3D");
 	glDrawBuffers = (PFNGLDRAWBUFFERSPROC)loadGlFunction("glDrawBuffers");
+	glGenQueries = (PFNGLGENQUERIESPROC)loadGlFunction("glGenQueries");
+	glDeleteQueries = (PFNGLDELETEQUERIESPROC)loadGlFunction("glDeleteQueries");
+	glBeginQuery = (PFNGLBEGINQUERYPROC)loadGlFunction("glBeginQuery");
+	glEndQuery = (PFNGLENDQUERYPROC)loadGlFunction("glEndQuery");
+	glGetQueryObjectui64v = (PFNGLGETQUERYOBJECTUI64VPROC)loadGlFunction("glGetQueryObjectui64v");
+	glGetQueryObjectiv = (PFNGLGETQUERYOBJECTIVPROC)loadGlFunction("glGetQueryObjectiv");
+	glBindImageTexture = (PFNGLBINDIMAGETEXTUREPROC)loadGlFunction("glBindImageTexture");
     _glInit = true;
 	return SUCCESS;
 }

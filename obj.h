@@ -710,8 +710,11 @@ void calculateSDFFromMesh(DWORD* sdfData, DWORD dx, DWORD dy, DWORD dz, Triangle
 							float v3 = model.attributesBuffer[j*model.attributesCount*3+model.attributesCount*2+1];
 							float u = dstInfo.u * u1 + dstInfo.v * u2 + dstInfo.w * u3;
 							float v = dstInfo.u * v1 + dstInfo.v * v2 + dstInfo.w * v3;
-							if(model.material) sdfData[idx] = textureRepeated(model.material->textures[0], u, v);
-							else sdfData[idx] = RGBA(255, 255, 255, 255);
+							if(model.material){
+								sdfData[idx] = textureRepeated(model.material->textures[0], u, v);
+								sdfData[idx] = A(sdfData[idx], 128);
+							}
+							else sdfData[idx] = RGBA(255, 255, 255, 128);
 							marked[idx] = dstInfo.distance;
 						}
 					}

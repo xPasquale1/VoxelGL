@@ -11,7 +11,7 @@ uniform int gi_second_bounce;
 uniform vec3 camPos;
 uniform mat3 camRot;
 layout(binding = 1, rgba8ui) uniform uimage3D sdfData;
-layout(binding = 2, r8ui) uniform uimage3D sdfData4;
+layout(binding = 2, r8ui) uniform uimage3D sdfData8;
 layout(location = 0) out vec3 albedo;
 layout(location = 1) out vec4 lighting;
 uniform vec2 windowSize;
@@ -64,7 +64,7 @@ HitData trace(vec3 origin, vec3 dir){
     ret.didHit = false;
     vec3 normal = vec3(0, 1, 0);
 
-    ivec3 voxel_pos = (ivec3(origin) >> 2) << 2;
+    ivec3 voxel_pos = (ivec3(origin) >> 3) << 3;
     vec3 inv_dir = 1.0 / dir;
     vec3 pos = origin;
     ivec3 step_dir = ivec3(
@@ -73,26 +73,26 @@ HitData trace(vec3 origin, vec3 dir){
         int(sign(dir.z))
     );
     vec3 step_dir_f = vec3(step_dir);
-    int scale = 4;
+    int scale = 8;
     ivec3 side_offset = ivec3(step(0.0, dir));
-    ivec3 block4 = voxel_pos/4;
+    ivec3 block8 = voxel_pos/8;
     ivec3 sidePos = voxel_pos + side_offset * scale;
     vec3 side_dist = (sidePos - pos) * inv_dir;
 
     for(int i=0; i < 1024; ++i){
         if(any(lessThan(voxel_pos, ivec3(0))) || any(greaterThanEqual(voxel_pos, sdfSize))) return ret;
-        if(scale == 4){
-            block4 = voxel_pos/4;
-            uint sdf_data = imageLoad(sdfData4, block4).r;
+        if(scale == 8){
+            block8 = voxel_pos/8;
+            uint sdf_data = imageLoad(sdfData8, block8).r;
             if(sdf_data > 0){
                 scale = 1;
                 voxel_pos = ivec3(pos);
                 continue;
             }
         }else{
-            if(block4 != voxel_pos/4){
-                scale = 4;
-                voxel_pos = (voxel_pos>>2)<<2;
+            if(block8 != voxel_pos/8){
+                scale = 8;
+                voxel_pos = (voxel_pos >> 3) << 3;
                 continue;
             }
             uvec4 sdf_data = imageLoad(sdfData, voxel_pos);
@@ -140,7 +140,7 @@ HitData traceMax(vec3 origin, vec3 dir, float max_distance){
     ret.didHit = false;
     vec3 normal = vec3(0, 1, 0);
 
-    ivec3 voxel_pos = (ivec3(origin) >> 2) << 2;
+    ivec3 voxel_pos = (ivec3(origin) >> 3) << 3;
     vec3 inv_dir = 1.0 / dir;
     vec3 pos = origin;
     ivec3 step_dir = ivec3(
@@ -149,18 +149,18 @@ HitData traceMax(vec3 origin, vec3 dir, float max_distance){
         int(sign(dir.z))
     );
     vec3 step_dir_f = vec3(step_dir);
-    int scale = 4;
+    int scale = 8;
     ivec3 side_offset = ivec3(step(0.0, dir));
-    ivec3 block4 = voxel_pos/4;
+    ivec3 block8 = voxel_pos/8;
     ivec3 sidePos = voxel_pos + side_offset * scale;
     vec3 side_dist = (sidePos - pos) * inv_dir;
 
     for(int i=0; i < 1024; ++i){
         if(distance(pos, origin) > max_distance) return ret;
         if(any(lessThan(voxel_pos, ivec3(0))) || any(greaterThanEqual(voxel_pos, sdfSize))) return ret;
-        if(scale == 4){
-            block4 = voxel_pos/4;
-            uint sdf_data = imageLoad(sdfData4, block4).r;
+        if(scale == 8){
+            block8 = voxel_pos/8;
+            uint sdf_data = imageLoad(sdfData8, block8).r;
             if(sdf_data > 0){
                 scale = 1;
                 voxel_pos = ivec3(pos);
@@ -168,9 +168,9 @@ HitData traceMax(vec3 origin, vec3 dir, float max_distance){
             }
         }else{
             if(distance(pos, origin) > max_distance) return ret;
-            if(block4 != voxel_pos/4){
-                scale = 4;
-                voxel_pos = (voxel_pos>>2)<<2;
+            if(block8 != voxel_pos/8){
+                scale = 8;
+                voxel_pos = (voxel_pos >> 3) << 3;
                 continue;
             }
             uvec4 sdf_data = imageLoad(sdfData, voxel_pos);

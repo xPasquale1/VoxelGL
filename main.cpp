@@ -180,6 +180,10 @@ struct GPUTimer{
 	}
 };
 
+struct TreeNode{
+	QWORD child_mask;
+};
+
 void createSDFLevels(TriangleModel* models, DWORD modelCount, GLuint* texture, GLint dx, GLint dy, GLint dz){
     glGenTextures(3, texture);
     glBindTexture(GL_TEXTURE_3D, texture[0]);
@@ -201,24 +205,6 @@ void createSDFLevels(TriangleModel* models, DWORD modelCount, GLuint* texture, G
 	glBindImageTexture(1, texture[0], 0, GL_TRUE, 0, GL_READ_WRITE, GL_RGBA8UI);
 	glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 
-	GLint mipdx4 = std::ceil((float)dx/4);
-	GLint mipdy4 = std::ceil((float)dy/4);
-	GLint mipdz4 = std::ceil((float)dz/4);
-	BYTE* sdfMipMap4 = alloc<BYTE>(mipdx4*mipdy4*mipdz4, "SDF MipMap4");
-
-	for(GLint i=0; i < mipdx4*mipdy4*mipdz4; ++i) sdfMipMap4[i] = 0;
-	for(GLint x=0; x < dx; ++x){
-		for(GLint y=0; y < dy; ++y){
-			for(GLint z=0; z < dz; ++z){
-				if(A(sdfData[z * dy * dx + y * dx + x]) > 0) sdfMipMap4[(z/4) * mipdy4 * mipdx4 + (y/4) * mipdx4 + (x/4)] = 255;
-			}
-		}
-	}
-	glBindTexture(GL_TEXTURE_3D, texture[1]);
-	glTexImage3D(GL_TEXTURE_3D, 0, GL_R8UI, mipdx4, mipdy4, mipdz4, 0, GL_RED_INTEGER, GL_UNSIGNED_BYTE, sdfMipMap4);
-	glBindImageTexture(2, texture[1], 0, GL_TRUE, 0, GL_READ_WRITE, GL_R8UI);
-    glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-
 	GLint mipdx8 = std::ceil((float)dx/8);
 	GLint mipdy8 = std::ceil((float)dy/8);
 	GLint mipdz8 = std::ceil((float)dz/8);
@@ -232,14 +218,13 @@ void createSDFLevels(TriangleModel* models, DWORD modelCount, GLuint* texture, G
 			}
 		}
 	}
-	glActiveTexture(GL_TEXTURE3);
-	glBindTexture(GL_TEXTURE_3D, texture[2]);
-	glTexImage3D(GL_TEXTURE_3D, 0, GL_R8, mipdx8, mipdy8, mipdz8, 0, GL_RED, GL_UNSIGNED_BYTE, sdfMipMap8);
+	glBindTexture(GL_TEXTURE_3D, texture[1]);
+	glTexImage3D(GL_TEXTURE_3D, 0, GL_R8UI, mipdx8, mipdy8, mipdz8, 0, GL_RED_INTEGER, GL_UNSIGNED_BYTE, sdfMipMap8);
+	glBindImageTexture(2, texture[1], 0, GL_TRUE, 0, GL_READ_WRITE, GL_R8UI);
     glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 
 	//Speichernutzung ausgeben
 	float total = getMemoryUsageByTag("SDF Daten");
-	total += getMemoryUsageByTag("SDF MipMap4");
 	total += getMemoryUsageByTag("SDF MipMap8");
 	const char* sizeNames[] = {"B", "KB", "MB", "GB"};
 	BYTE sizeNameIdx = 0;
@@ -253,7 +238,6 @@ void createSDFLevels(TriangleModel* models, DWORD modelCount, GLuint* texture, G
 	std::cout << memoryText << std::endl;
 	//TODO Sollte natürlich deallokiert werden
 	// dealloc(sdfData);
-	// dealloc(sdfMipMap4);
 	// dealloc(sdfMipMap8);
 }
 
@@ -431,7 +415,7 @@ INT WinMain(HINSTANCE hInstance, HINSTANCE hPreviousInst, LPSTR lpszCmdLine, int
 			if(getButton(mouse, MOUSE_LMB) && !getButton(mouse, MOUSE_PREV_LMB)){
 				place_voxel_program.use();
 				glUniform1i(glGetUniformLocation(place_voxel_program.program, "sdfData"), 1);
-				glUniform1i(glGetUniformLocation(place_voxel_program.program, "sdfData4"), 2);
+				glUniform1i(glGetUniformLocation(place_voxel_program.program, "sdfData8"), 2);
 				glUniform3i(glGetUniformLocation(place_voxel_program.program, "sdfSize"), sdfSize[0], sdfSize[1], sdfSize[2]);
 				glUniformMatrix3fv(glGetUniformLocation(place_voxel_program.program, "camRot"), 1, false, rotM);
 				glUniform3f(glGetUniformLocation(place_voxel_program.program, "camPos"), camPos.x, camPos.y, camPos.z);
@@ -449,7 +433,7 @@ INT WinMain(HINSTANCE hInstance, HINSTANCE hPreviousInst, LPSTR lpszCmdLine, int
 				compute_gi_probes_program.use();
 				GLuint numGroups = std::ceil((gi_probes[0] * gi_probes[1] * gi_probes[2]) / 256.f);
 				glUniform1i(glGetUniformLocation(compute_gi_probes_program.program, "sdfData"), 1);
-				glUniform1i(glGetUniformLocation(compute_gi_probes_program.program, "sdfData4"), 2);
+				glUniform1i(glGetUniformLocation(compute_gi_probes_program.program, "sdfData8"), 2);
 				glUniform3i(glGetUniformLocation(compute_gi_probes_program.program, "sdfSize"), sdfSize[0], sdfSize[1], sdfSize[2]);
 				glUniform3i(glGetUniformLocation(compute_gi_probes_program.program, "gi_probe_size"), gi_probes[0], gi_probes[1], gi_probes[2]);
 				glDispatchCompute(numGroups, 1, 1);
@@ -463,7 +447,7 @@ INT WinMain(HINSTANCE hInstance, HINSTANCE hPreviousInst, LPSTR lpszCmdLine, int
 		gBuffer.bind();
 
 		glUniform1i(glGetUniformLocation(primaryRaymarchProgram.program, "sdfData"), 1);
-		glUniform1i(glGetUniformLocation(primaryRaymarchProgram.program, "sdfData4"), 2);
+		glUniform1i(glGetUniformLocation(primaryRaymarchProgram.program, "sdfData8"), 2);
 		glUniform1i(glGetUniformLocation(primaryRaymarchProgram.program, "gi_enabled"), getCheckBoxFlag(checkboxes[0], CHECKBOXFLAG_CHECKED));
 		glUniform1i(glGetUniformLocation(primaryRaymarchProgram.program, "gi_second_bounce"), getCheckBoxFlag(checkboxes[1], CHECKBOXFLAG_CHECKED));
         glUniformMatrix3fv(glGetUniformLocation(primaryRaymarchProgram.program, "camRot"), 1, false, rotM);

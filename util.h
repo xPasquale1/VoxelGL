@@ -102,7 +102,6 @@ constexpr bool getButton(Mouse& mouse, MOUSEBUTTON button){return (mouse.button 
 constexpr void setButton(Mouse& mouse, MOUSEBUTTON button){mouse.button |= button;}
 constexpr void resetButton(Mouse& mouse, MOUSEBUTTON button){mouse.button &= ~button;}
 
-//TODO always inline?, compiler weiß es bestimmt besser
 constexpr const char* stringLookUp2(long value){
 	return &"001020304050607080900111213141516171819102122232425262728292"
 			"031323334353637383930414243444546474849405152535455565758595"
@@ -283,7 +282,7 @@ ErrCode ErrCheck(ErrCode code, const char* msg="\0", ErrCodeFlags flags=ERR_NO_F
 	return SUCCESS;
 }
 
-enum KEYBOARDBUTTON : unsigned long long{
+enum KEYBOARDBUTTON : QWORD{
 	KEY_NONE = 0ULL,
 	KEY_0 = 0ULL,
 	KEY_1 = 1ULL << 1,
@@ -334,12 +333,12 @@ enum KEYBOARDBUTTON : unsigned long long{
 	KEY_RIGHT = 1ULL << 46
 };
 struct Keyboard{
-	unsigned long long buttons;	//Bits siehe enum oben
+	QWORD buttons;	//Bits siehe enum oben
 }; static Keyboard keyboard;
 
-inline constexpr bool getButton(Keyboard& keyboard, KEYBOARDBUTTON button){return keyboard.buttons & button;}
-inline constexpr void setButton(Keyboard& keyboard, KEYBOARDBUTTON button){keyboard.buttons |= button;}
-inline constexpr void resetButton(Keyboard& keyboard, KEYBOARDBUTTON button){keyboard.buttons &= ~button;}
+constexpr bool getButton(Keyboard& keyboard, KEYBOARDBUTTON button){return keyboard.buttons & button;}
+constexpr void setButton(Keyboard& keyboard, KEYBOARDBUTTON button){keyboard.buttons |= button;}
+constexpr void resetButton(Keyboard& keyboard, KEYBOARDBUTTON button){keyboard.buttons &= ~button;}
 
 struct Timer{
 	LARGE_INTEGER startTime;
@@ -352,7 +351,7 @@ void resetTimer(Timer& timer)noexcept{
 	QueryPerformanceCounter(&timer.startTime);
 }
 //Gibt den Zeitunterschied seid dem Startzeitpunkt in Millisekunden zurück
-DWORD getTimerMillis(Timer& timer)noexcept{
+QWORD getTimerMillis(Timer& timer)noexcept{
 	LARGE_INTEGER endTime;
 	QueryPerformanceCounter(&endTime);
 	LONGLONG timediff = endTime.QuadPart - timer.startTime.QuadPart;
@@ -360,7 +359,7 @@ DWORD getTimerMillis(Timer& timer)noexcept{
 	return (timediff / timer.frequency.QuadPart);
 }
 //Gibt den Zeitunterschied seid dem Startzeitpunkt in Mikrosekunden zurück
-DWORD getTimerMicros(Timer& timer)noexcept{
+QWORD getTimerMicros(Timer& timer)noexcept{
 	LARGE_INTEGER endTime;
 	QueryPerformanceCounter(&endTime);
 	LONGLONG timediff = endTime.QuadPart - timer.startTime.QuadPart;
@@ -369,7 +368,7 @@ DWORD getTimerMicros(Timer& timer)noexcept{
 }
 //Gibt den Zeitunterschied seid dem Startzeitpunkt in "Nanosekunden" zurück
 //(leider hängt alles von QueryPerformanceFrequency() ab, also kann es sein, dass man nur Intervalle von Nanosekunden bekommt)
-DWORD getTimerNanos(Timer& timer)noexcept{
+QWORD getTimerNanos(Timer& timer)noexcept{
 	LARGE_INTEGER endTime;
 	QueryPerformanceCounter(&endTime);
 	LONGLONG timediff = endTime.QuadPart - timer.startTime.QuadPart;

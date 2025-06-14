@@ -663,6 +663,8 @@ void calculateSDFFromMesh(DWORD* sdfData, DWORD dx, DWORD dy, DWORD dz, Triangle
     float* marked = alloc<float>(dx * dy * dz, "SDF-Gen-MarkedArray");
     for(DWORD i=0; i < dx*dy*dz; ++i) marked[i] = 1000000.f;
 
+	DWORD non_air_voxels = 0;
+
 	for(DWORD i=0; i < modelCount; ++i){
 		const TriangleModel& model = models[i];
 		for (DWORD j = 0; j < model.triangleCount; ++j) {
@@ -716,11 +718,13 @@ void calculateSDFFromMesh(DWORD* sdfData, DWORD dx, DWORD dy, DWORD dz, Triangle
 							}
 							else sdfData[idx] = RGBA(255, 255, 255, 128);
 							marked[idx] = dstInfo.distance;
+							non_air_voxels++;
 						}
 					}
 				}
 			}
 		}
 	}
+	std::cout << "Nicht leere Voxel: " << non_air_voxels << std::endl;
     dealloc(marked);
 }

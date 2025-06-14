@@ -293,7 +293,7 @@ INT WinMain(HINSTANCE hInstance, HINSTANCE hPreviousInst, LPSTR lpszCmdLine, int
 	DWORD modelCount = 0;
 	DWORD materialCount = 0;
 	resetTimer(timer);
-	if(ErrCheck(loadObj("objects/bistro_interior.obj", models, modelCount, materials, materialCount, 0, 0, 0, 0, -1, 1, 1), "Modell laden") != SUCCESS) return -1;
+	if(ErrCheck(loadObj("objects/bistro.obj", models, modelCount, materials, materialCount, 0, 0, 0, 0, -1, 1, 1), "Modell laden") != SUCCESS) return -1;
 	std::cout << "Modell laden: " << getTimerMillis(timer)/1000.f << "s" << std::endl;
 
 	fvec3 modelMin = {0};
@@ -315,7 +315,7 @@ INT WinMain(HINSTANCE hInstance, HINSTANCE hPreviousInst, LPSTR lpszCmdLine, int
 	float dy = modelMax.y-modelMin.y;
 	float dz = modelMax.z-modelMin.z;
 	float totalVolume = dx*dy*dz;
-	float targetVolume = 1600*1000*100;
+	float targetVolume = 1600*1000*1000;
 	float scale = std::cbrtf(targetVolume/totalVolume);
 	GLint sdfSize[3] = {(GLint)(dx*scale), (GLint)(dy*scale), (GLint)(dz*scale)};
 	std::cout << sdfSize[0] << ", " << sdfSize[1] << ", " << sdfSize[2] << std::endl;

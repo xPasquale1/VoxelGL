@@ -60,7 +60,10 @@ PFNGLBINDBUFFERPROC glBindBuffer;
 PFNGLBINDBUFFERBASEPROC glBindBufferBase;
 PFNGLBUFFERDATAPROC glBufferData;
 PFNGLBUFFERSUBDATAPROC glBufferSubData;
+PFNGLCOPYBUFFERSUBDATAPROC glCopyBufferSubData;
 PFNGLGETBUFFERSUBDATAPROC glGetBufferSubData;
+PFNGLMAPBUFFERPROC glMapBuffer;
+PFNGLUNMAPBUFFERPROC glUnmapBuffer;
 PFNGLGENVERTEXARRAYSPROC glGenVertexArrays;
 PFNGLDELETEVERTEXARRAYSPROC glDeleteVertexArrays;
 PFNGLBINDVERTEXARRAYPROC glBindVertexArray;
@@ -154,7 +157,10 @@ ErrCode _init()noexcept{
 	glBindBufferBase = (PFNGLBINDBUFFERBASEPROC)loadGlFunction("glBindBufferBase");
 	glBufferData = (PFNGLBUFFERDATAPROC)loadGlFunction("glBufferData");
 	glBufferSubData = (PFNGLBUFFERSUBDATAPROC)loadGlFunction("glBufferSubData");
+	glCopyBufferSubData = (PFNGLCOPYBUFFERSUBDATAPROC)loadGlFunction("glCopyBufferSubData");
 	glGetBufferSubData = (PFNGLGETBUFFERSUBDATAPROC)loadGlFunction("glGetBufferSubData");
+	glMapBuffer = (PFNGLMAPBUFFERPROC)loadGlFunction("glMapBuffer");
+	glUnmapBuffer = (PFNGLUNMAPBUFFERPROC)loadGlFunction("glUnmapBuffer");
 	glGenVertexArrays = (PFNGLGENVERTEXARRAYSPROC)loadGlFunction("glGenVertexArrays");
 	glDeleteVertexArrays = (PFNGLDELETEVERTEXARRAYSPROC)loadGlFunction("glDeleteVertexArrays");
 	glBindVertexArray = (PFNGLBINDVERTEXARRAYPROC)loadGlFunction("glBindVertexArray");
@@ -1716,3 +1722,73 @@ void updateCheckBoxes(Window& window, Font& font, Checkbox* boxes, WORD boxCount
 		drawFontString(window, font, glyphs, boxes[i].label.c_str(), boxes[i].pos.x+boxes[i].size.x, boxes[i].pos.y+boxes[i].size.y/2-font.pixelSize/2);
 	}
 }
+
+//TODO Möglichkeit zum Ändern des buffer usages
+struct SSBO{
+	GLuint ssbo;
+	QWORD total_size;
+	QWORD occupied_size;
+	GLuint binding;
+	GLenum buffer_usage;
+
+	SSBO(GLenum usage = GL_STATIC_DRAW){
+		glGenBuffers(1, &ssbo);
+		glBindBuffer(GL_SHADER_STORAGE_BUFFER, ssbo);
+		glBufferData(GL_SHADER_STORAGE_BUFFER, 0, NULL, usage);
+		glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, ssbo);
+		binding = 0;
+		total_size = 0;
+		occupied_size = 0;
+		buffer_usage = usage;
+	}
+
+	SSBO(GLuint binding_index, QWORD initial_byte_size, GLenum usage = GL_STATIC_DRAW){
+		glGenBuffers(1, &ssbo);
+		glBindBuffer(GL_SHADER_STORAGE_BUFFER, ssbo);
+		glBufferData(GL_SHADER_STORAGE_BUFFER, initial_byte_size, NULL, usage);
+		glBindBufferBase(GL_SHADER_STORAGE_BUFFER, binding_index, ssbo);
+		binding = binding_index;
+		total_size = initial_byte_size;
+		occupied_size = 0;
+		buffer_usage = usage;
+	}
+	~SSBO(){
+		glDeleteBuffers(1, &ssbo);
+	}
+
+	void realloc(QWORD new_size)noexcept{
+		GLuint new_ssbo;
+		glGenBuffers(1, &new_ssbo);
+		glBindBuffer(GL_COPY_WRITE_BUFFER, new_ssbo);
+		glBufferData(GL_COPY_WRITE_BUFFER, new_size, NULL, buffer_usage);
+
+		glBindBuffer(GL_COPY_READ_BUFFER, ssbo);
+
+		glCopyBufferSubData(GL_COPY_READ_BUFFER, GL_COPY_WRITE_BUFFER, 0, 0, occupied_size);
+		glBindBufferBase(GL_SHADER_STORAGE_BUFFER, binding, new_ssbo);
+
+		glDeleteBuffers(1, &ssbo);
+		ssbo = new_ssbo;
+		total_size = new_size;
+	}
+
+    void append(void* data, QWORD byte_size){
+        QWORD required = occupied_size + byte_size;
+        if(required > total_size){
+            realloc(max(required, total_size * 2));
+        }
+
+        glBindBuffer(GL_SHADER_STORAGE_BUFFER, ssbo);
+        glBufferSubData(GL_SHADER_STORAGE_BUFFER, occupied_size, byte_size, data);
+
+        occupied_size += byte_size;
+    }
+
+	void set_binding_index(GLuint index)noexcept{
+		glBindBufferBase(GL_SHADER_STORAGE_BUFFER, index, ssbo);
+	}
+
+	void clear()noexcept{
+		occupied_size = 0;
+	}
+};

@@ -277,7 +277,7 @@ INT WinMain(HINSTANCE hInstance, HINSTANCE hPreviousInst, LPSTR lpszCmdLine, int
 	DWORD modelCount = 0;
 	DWORD materialCount = 0;
 	resetTimer(timer);
-	if(ErrCheck(loadObj("objects/bistro.obj", models, modelCount, materials, materialCount, 0, 0, 0, 0, -1, 1, 1), "Modell laden") != SUCCESS) return -1;
+	if(ErrCheck(loadObj("objects/sponza.obj", models, modelCount, materials, materialCount, 0, 0, 0, 0, -1, 1, 1), "Modell laden") != SUCCESS) return -1;
 	std::cout << "Modell laden: " << getTimerMillis(timer)/1000.f << "s" << std::endl;
 
 	fvec3 modelMin = {0};
@@ -299,7 +299,7 @@ INT WinMain(HINSTANCE hInstance, HINSTANCE hPreviousInst, LPSTR lpszCmdLine, int
 	float dy = modelMax.y-modelMin.y;
 	float dz = modelMax.z-modelMin.z;
 	float totalVolume = dx*dy*dz;
-	float targetVolume = 1600*1000*1000;
+	float targetVolume = 200'000'000;
 	float scale = std::cbrtf(targetVolume/totalVolume);
 	GLint sdfSize[3] = {(GLint)(dx*scale), (GLint)(dy*scale), (GLint)(dz*scale)};
 	std::cout << sdfSize[0] << ", " << sdfSize[1] << ", " << sdfSize[2] << std::endl;
@@ -317,18 +317,13 @@ INT WinMain(HINSTANCE hInstance, HINSTANCE hPreviousInst, LPSTR lpszCmdLine, int
 	GLint gi_probes[3] = {GLint(std::ceil(sdfSize[0]/gi_probe_inv_scale)), GLint(std::ceil(sdfSize[1]/gi_probe_inv_scale)), GLint(std::ceil(sdfSize[2]/gi_probe_inv_scale))};
 	std::cout << "GI Probes: " << gi_probes[0] << ", " << gi_probes[1] << ", " << gi_probes[2] << " | " << gi_probes[0]*gi_probes[1]*gi_probes[2] << std::endl;
 
-	GLuint gi_probes_ssbo[2];
-	glGenBuffers(2, gi_probes_ssbo);
-	glBindBuffer(GL_SHADER_STORAGE_BUFFER, gi_probes_ssbo[0]);
 	const int gi_probe_buffer_size = 4 * 6 * sizeof(float) * gi_probes[0]*gi_probes[1]*gi_probes[2];	//sizeof(vec3) * float[6] * sizeof(float) * Anzahl GI Probes
+	SSBO gi_probes_buffer[2];
+
 	float* tmpBuffer = alloc<float>(gi_probe_buffer_size/sizeof(float), "tmp gi probes buffer init data");
 	for(int i=0; i < gi_probe_buffer_size/sizeof(float); ++i) tmpBuffer[i] = 0;
-	glBufferData(GL_SHADER_STORAGE_BUFFER, gi_probe_buffer_size, tmpBuffer, GL_STATIC_DRAW);
-	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, gi_probes_ssbo[0]);
-
-	glBindBuffer(GL_SHADER_STORAGE_BUFFER, gi_probes_ssbo[1]);
-	glBufferData(GL_SHADER_STORAGE_BUFFER, gi_probe_buffer_size, tmpBuffer, GL_STATIC_DRAW);
-	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, gi_probes_ssbo[1]);
+	gi_probes_buffer[0].append(tmpBuffer, gi_probe_buffer_size);
+	gi_probes_buffer[1].append(tmpBuffer, gi_probe_buffer_size);
 	dealloc(tmpBuffer);
 
 	GLProgram compute_gi_probes_program;
@@ -337,8 +332,8 @@ INT WinMain(HINSTANCE hInstance, HINSTANCE hPreviousInst, LPSTR lpszCmdLine, int
 	GPUTimer gpu_timer;
 	for(int i=0; i < 6; ++i){
 		gpu_timer.restart();
-		glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, gi_probes_ssbo[i%2]);
-		glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, gi_probes_ssbo[(i+1)%2]);
+		gi_probes_buffer[0].set_binding_index((GLuint)i%2);
+		gi_probes_buffer[1].set_binding_index((GLuint)(i+1)%2);
 		compute_gi_probes_program.use();
 		GLuint numGroups = std::ceil((gi_probes[0] * gi_probes[1] * gi_probes[2]) / 256.f);
 		std::cout << "GI Compute Groups: " << numGroups << std::endl;
@@ -428,8 +423,8 @@ INT WinMain(HINSTANCE hInstance, HINSTANCE hPreviousInst, LPSTR lpszCmdLine, int
 			resetCheckBoxFlag(checkboxes[2], CHECKBOXFLAG_CHECKED);
 			for(int i=0; i < 6; ++i){
 				gpu_timer.restart();
-				glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, gi_probes_ssbo[i%2]);
-				glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, gi_probes_ssbo[(i+1)%2]);
+				gi_probes_buffer[0].set_binding_index((GLuint)i%2);
+				gi_probes_buffer[1].set_binding_index((GLuint)(i+1)%2);
 				compute_gi_probes_program.use();
 				GLuint numGroups = std::ceil((gi_probes[0] * gi_probes[1] * gi_probes[2]) / 256.f);
 				glUniform1i(glGetUniformLocation(compute_gi_probes_program.program, "sdfData"), 1);

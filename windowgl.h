@@ -494,7 +494,7 @@ ErrCode loadShader(GLuint& shader, GLenum shaderType, const GLchar* code, GLint 
 	if(success == GL_FALSE){
 		GLint logSize = 0;
 		glGetShaderiv(shader, GL_INFO_LOG_LENGTH, &logSize);
-		GLchar logBuffer[200];
+		GLchar logBuffer[1200];
 		GLsizei charsWritten = 0;
 		glGetShaderInfoLog(shader, sizeof(logBuffer), &charsWritten, logBuffer);
 		std::cerr << logBuffer << std::endl;

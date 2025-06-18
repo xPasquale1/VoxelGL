@@ -1,3 +1,5 @@
+#pragma once
+
 #include "windowgl.h"
 
 //TODO vllt weg? Oder zumindest passender benennen wie TriangleVertexPositions oder so

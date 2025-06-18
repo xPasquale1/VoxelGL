@@ -39,7 +39,7 @@ std::unordered_map<std::string, std::list<void*>> _memAllocsHints;
 #endif
 
 template<typename T>
-T* alloc(QWORD count, const std::string& tag = "Unknown"){
+T* alloc(QWORD count, const std::string& tag = "Unknown")noexcept{
 	T* ptr = new(std::nothrow) T[count];
     #ifdef TRACKMEMORY
     if(ptr){
@@ -55,7 +55,7 @@ T* alloc(QWORD count, const std::string& tag = "Unknown"){
 }
 
 template <typename T>
-void dealloc(T* ptr){
+void dealloc(T* ptr)noexcept{
 	delete[] ptr;
     #ifdef TRACKMEMORY
 	if(!ptr) return;
@@ -65,7 +65,7 @@ void dealloc(T* ptr){
     #endif
 }
 
-QWORD getTotalMemoryUsage(){
+QWORD getTotalMemoryUsage()noexcept{
     QWORD total = 0;
     #ifdef TRACKMEMORY
     for(const auto& it : _memAllocsMap){
@@ -75,7 +75,7 @@ QWORD getTotalMemoryUsage(){
     return total;
 }
 
-QWORD getMemoryUsageByTag(const std::string& tag){
+QWORD getMemoryUsageByTag(const std::string& tag)noexcept{
     QWORD total = 0;
     #ifdef TRACKMEMORY
     std::list<void*> list = _memAllocsHints[tag];
@@ -177,6 +177,21 @@ float stringToFloat(const char* str)noexcept{
     }
 
     return result * sign;
+}
+
+std::string memoryUsageToHuman(QWORD bytes)noexcept{
+	float total = bytes;
+	const char* sizeNames[] = {"B", "KB", "MB", "GB", "TB"};
+	BYTE sizeNameIdx = 0;
+	while(total >= 1000){
+		total /= 1000;
+		sizeNameIdx++;
+	}
+	std::string memoryText;
+	memoryText += floatToString(total);
+	memoryText += ' ';
+	memoryText += sizeNames[sizeNameIdx];
+	return memoryText;
 }
 
 //Error-Codes

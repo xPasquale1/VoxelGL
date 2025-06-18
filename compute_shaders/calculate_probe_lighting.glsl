@@ -3,8 +3,6 @@
 #define PI 3.14159265359
 
 uniform ivec3 gi_probe_size;
-layout(binding = 1, rgba8ui) uniform uimage3D sdfData;
-layout(binding = 2, r8ui) uniform uimage3D sdfData8;
 uniform ivec3 sdfSize;
 
 struct GIProbe{
@@ -19,6 +17,29 @@ layout(std430, binding = 1) readonly buffer GIProbeData2{
     GIProbe gi_data2[];
 };
 
+struct BrickmapNode{
+    uint mask_low;
+    uint mask_high;
+    uint offset;
+};
+
+layout(std430, binding = 2) readonly buffer Brickmap{
+    BrickmapNode brickmap_data[];
+};
+
+layout(std430, binding = 3) readonly buffer Voxel{
+    uint voxel_data[];
+};
+
+
+vec4 decode_color(uint color){
+    return vec4(
+        float((color >> 16) & 0xFFu),
+        float((color >> 8) & 0xFFu),
+        float(color & 0xFFu),
+        float((color >> 24) & 0xFFu)
+    ) / 255.0;
+}
 
 uint rng_state;
 float random(){
@@ -55,7 +76,7 @@ HitData trace(vec3 origin, vec3 dir){
     ret.didHit = false;
     vec3 normal = vec3(0, 1, 0);
 
-    ivec3 voxel_pos = (ivec3(origin) >> 3) << 3;
+    ivec3 voxel_pos = (ivec3(origin) >> 2) << 2;
     vec3 inv_dir = 1.0 / dir;
     vec3 pos = origin;
     ivec3 step_dir = ivec3(
@@ -63,33 +84,47 @@ HitData trace(vec3 origin, vec3 dir){
         int(sign(dir.y)),
         int(sign(dir.z))
     );
-    vec3 step_dir_f = vec3(step_dir);
-    int scale = 8;
+    int scale = 4;
     ivec3 side_offset = ivec3(step(0.0, dir));
-    ivec3 block8 = voxel_pos/8;
+    ivec3 block4 = voxel_pos/4;
     ivec3 sidePos = voxel_pos + side_offset * scale;
     vec3 side_dist = (sidePos - pos) * inv_dir;
+    ivec3 sdfSize4 = (sdfSize + 3) / 4;
 
-    for(int i=0; i < 1024; ++i){
+    BrickmapNode node;
+
+    for(int i=0; i < 2048; ++i){
         if(any(lessThan(voxel_pos, ivec3(0))) || any(greaterThanEqual(voxel_pos, sdfSize))) return ret;
-        if(scale == 8){
-            block8 = voxel_pos/8;
-            uint sdf_data = imageLoad(sdfData8, block8).r;
-            if(sdf_data > 0){
+        if(scale == 4){
+            block4 = voxel_pos/4;
+            uint brick_idx = block4.z * sdfSize4.y * sdfSize4.x + block4.y * sdfSize4.x + block4.x;
+            node = brickmap_data[brick_idx];
+            if((node.mask_low | node.mask_high) != 0){
                 scale = 1;
-                voxel_pos = ivec3(pos);
+                ivec3 brickBase = block4 * 4;
+                vec3 brickBaseF = vec3(brickBase);
+                vec3 localF = pos - brickBaseF;
+                ivec3 localI = ivec3(floor(localF));
+                localI = clamp(localI, ivec3(0), ivec3(3));
+                voxel_pos = brickBase + localI;
                 continue;
             }
         }else{
-            if(block8 != voxel_pos/8){
-                scale = 8;
-                voxel_pos = (voxel_pos >> 3) << 3;
+            if(voxel_pos/4 != block4){
+                scale = 4;
+                voxel_pos = (voxel_pos >> 2) << 2;
                 continue;
             }
-            uvec4 sdf_data = imageLoad(sdfData, voxel_pos);
-            if(sdf_data.a > 0){
+            uint local_x = voxel_pos.x % 4;
+            uint local_y = voxel_pos.y % 4;
+            uint local_z = voxel_pos.z % 4;
+            uint bit_index = local_z * 16 + local_y * 4 + local_x;
+            bool bit_set = (bit_index < 32) ? ((node.mask_low >> bit_index) & 1u) == 1u : ((node.mask_high >> (bit_index - 32)) & 1u) == 1u;
+            if(bit_set){
+                uint data_index = node.offset + bit_index;
+                uint color = voxel_data[data_index];
                 ret.didHit = true;
-                ret.color = vec4(sdf_data)/255.0;
+                ret.color = decode_color(color);
                 ret.position = pos;
                 ret.normal = normal;
                 return ret;
@@ -103,24 +138,24 @@ HitData trace(vec3 origin, vec3 dir){
         if(side_dist.x < side_dist.y && side_dist.x < side_dist.z){
             tmin = side_dist.x;
             voxel_pos.x += step_dir.x * scale;
-            normal = vec3(-step_dir_f.x, 0, 0);
-            pos.x = sidePos.x + step_dir_f.x*0.0001;
+            normal = vec3(-step_dir.x, 0, 0);
+            pos.x = sidePos.x;
             pos.y += tmin * dir.y;
             pos.z += tmin * dir.z;
         }else if(side_dist.y < side_dist.z){
             tmin = side_dist.y;
             voxel_pos.y += step_dir.y * scale;
-            normal = vec3(0, -step_dir_f.y, 0);
+            normal = vec3(0, -step_dir.y, 0);
             pos.x += tmin * dir.x;
-            pos.y = sidePos.y + step_dir_f.y*0.0001;
+            pos.y = sidePos.y;
             pos.z += tmin * dir.z;
         }else{
             tmin = side_dist.z;
             voxel_pos.z += step_dir.z * scale;
-            normal = vec3(0, 0, -step_dir_f.z);
+            normal = vec3(0, 0, -step_dir.z);
             pos.x += tmin * dir.x;
             pos.y += tmin * dir.y;
-            pos.z = sidePos.z + step_dir_f.z*0.0001;
+            pos.z = sidePos.z;
         }
     }
     return ret;
@@ -131,7 +166,7 @@ HitData traceMax(vec3 origin, vec3 dir, float max_distance){
     ret.didHit = false;
     vec3 normal = vec3(0, 1, 0);
 
-    ivec3 voxel_pos = (ivec3(origin) >> 3) << 3;
+    ivec3 voxel_pos = (ivec3(origin) >> 2) << 2;
     vec3 inv_dir = 1.0 / dir;
     vec3 pos = origin;
     ivec3 step_dir = ivec3(
@@ -139,35 +174,49 @@ HitData traceMax(vec3 origin, vec3 dir, float max_distance){
         int(sign(dir.y)),
         int(sign(dir.z))
     );
-    vec3 step_dir_f = vec3(step_dir);
-    int scale = 8;
+    int scale = 4;
     ivec3 side_offset = ivec3(step(0.0, dir));
-    ivec3 block8 = voxel_pos/8;
+    ivec3 block4 = voxel_pos/4;
     ivec3 sidePos = voxel_pos + side_offset * scale;
     vec3 side_dist = (sidePos - pos) * inv_dir;
+    ivec3 sdfSize4 = (sdfSize + 3) / 4;
 
-    for(int i=0; i < 1024; ++i){
+    BrickmapNode node;
+
+    for(int i=0; i < 2048; ++i){
         if(distance(pos, origin) > max_distance) return ret;
         if(any(lessThan(voxel_pos, ivec3(0))) || any(greaterThanEqual(voxel_pos, sdfSize))) return ret;
-        if(scale == 8){
-            block8 = voxel_pos/8;
-            uint sdf_data = imageLoad(sdfData8, block8).r;
-            if(sdf_data > 0){
+        if(scale == 4){
+            block4 = voxel_pos/4;
+            uint brick_idx = block4.z * sdfSize4.y * sdfSize4.x + block4.y * sdfSize4.x + block4.x;
+            node = brickmap_data[brick_idx];
+            if((node.mask_low | node.mask_high) != 0){
                 scale = 1;
-                voxel_pos = ivec3(pos);
+                ivec3 brickBase = block4 * 4;
+                vec3 brickBaseF = vec3(brickBase);
+                vec3 localF = pos - brickBaseF;
+                ivec3 localI = ivec3(floor(localF));
+                localI = clamp(localI, ivec3(0), ivec3(3));
+                voxel_pos = brickBase + localI;
                 continue;
             }
         }else{
             if(distance(pos, origin) > max_distance) return ret;
-            if(block8 != voxel_pos/8){
-                scale = 8;
-                voxel_pos = (voxel_pos >> 3) << 3;
+            if(voxel_pos/4 != block4){
+                scale = 4;
+                voxel_pos = (voxel_pos >> 2) << 2;
                 continue;
             }
-            uvec4 sdf_data = imageLoad(sdfData, voxel_pos);
-            if(sdf_data.a > 0){
+            uint local_x = voxel_pos.x % 4;
+            uint local_y = voxel_pos.y % 4;
+            uint local_z = voxel_pos.z % 4;
+            uint bit_index = local_z * 16 + local_y * 4 + local_x;
+            bool bit_set = (bit_index < 32) ? ((node.mask_low >> bit_index) & 1u) == 1u : ((node.mask_high >> (bit_index - 32)) & 1u) == 1u;
+            if(bit_set){
+                uint data_index = node.offset + bit_index;
+                uint color = voxel_data[data_index];
                 ret.didHit = true;
-                ret.color = vec4(sdf_data)/255.0;
+                ret.color = decode_color(color);
                 ret.position = pos;
                 ret.normal = normal;
                 return ret;
@@ -181,24 +230,24 @@ HitData traceMax(vec3 origin, vec3 dir, float max_distance){
         if(side_dist.x < side_dist.y && side_dist.x < side_dist.z){
             tmin = side_dist.x;
             voxel_pos.x += step_dir.x * scale;
-            normal = vec3(-step_dir_f.x, 0, 0);
-            pos.x = sidePos.x + step_dir_f.x*0.0001;
+            normal = vec3(-step_dir.x, 0, 0);
+            pos.x = sidePos.x;
             pos.y += tmin * dir.y;
             pos.z += tmin * dir.z;
         }else if(side_dist.y < side_dist.z){
             tmin = side_dist.y;
             voxel_pos.y += step_dir.y * scale;
-            normal = vec3(0, -step_dir_f.y, 0);
+            normal = vec3(0, -step_dir.y, 0);
             pos.x += tmin * dir.x;
-            pos.y = sidePos.y + step_dir_f.y*0.0001;
+            pos.y = sidePos.y;
             pos.z += tmin * dir.z;
         }else{
             tmin = side_dist.z;
             voxel_pos.z += step_dir.z * scale;
-            normal = vec3(0, 0, -step_dir_f.z);
+            normal = vec3(0, 0, -step_dir.z);
             pos.x += tmin * dir.x;
             pos.y += tmin * dir.y;
-            pos.z = sidePos.z + step_dir_f.z*0.0001;
+            pos.z = sidePos.z;
         }
     }
     return ret;
@@ -263,21 +312,21 @@ void main(){
                     float weight = wx * wy * wz;
 
                     vec3 world_pos = (vec3(probe_pos_grid) + 0.5) * vec3(sdfSize) / vec3(gi_probe_size);
-                    HitData hit_data = traceMax(gi_sample_data.position + gi_sample_data.normal * 0.01, normalize(world_pos - gi_sample_data.position), distance(world_pos, gi_sample_data.position));
+                    HitData hit_data = traceMax(gi_sample_data.position + gi_sample_data.normal * 0.0001, normalize(world_pos - gi_sample_data.position), distance(world_pos, gi_sample_data.position));
                     if(hit_data.didHit) continue;
 
                     uint probe_idx = probe_pos_grid.z * gi_probe_size.y * gi_probe_size.x + probe_pos_grid.y * gi_probe_size.x + probe_pos_grid.x;
                     total_weight += weight;
 
                     for(int d=0; d < 6; ++d){
-                        float n_dot_dir = max(dot(gi_sample_data.normal, directions[d]), 0.0);
-                        indirect_light_2 += gi_data2[probe_idx].light[d].rgb * n_dot_dir * weight;
+                        float n_dot_dir = dot(gi_sample_data.normal, directions[d]);
+                        indirect_light_2 += max(gi_data2[probe_idx].light[d].rgb * n_dot_dir * weight, vec3(0));
                     }
                 }
                 if(total_weight > 0.0) indirect_light_2 /= total_weight;
                 indirect_light += indirect_light_2 * 0.8;   //TODO Faktor zum "ausklingen"?
 
-                HitData gi_sample_direct_light_data = trace(gi_sample_data.position + gi_sample_data.normal * 0.01, sky_dir);
+                HitData gi_sample_direct_light_data = trace(gi_sample_data.position + gi_sample_data.normal * 0.0001, sky_dir);
                 if(gi_sample_direct_light_data.didHit == false) indirect_light += gi_sample_data.color.rgb * 2 * dot(dir, sample_direction);
             }else{
                 indirect_light += sky_color * 2 * dot(dir, sample_direction);

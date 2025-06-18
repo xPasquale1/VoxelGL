@@ -300,11 +300,11 @@ INT WinMain(HINSTANCE hInstance, HINSTANCE hPreviousInst, LPSTR lpszCmdLine, int
 	float dy = modelMax.y-modelMin.y;
 	float dz = modelMax.z-modelMin.z;
 	float totalVolume = dx*dy*dz;
-	float targetVolume = 8'000'000'000;
+	float targetVolume = 20'000'000'000;
 	float scale = std::cbrtf(targetVolume/totalVolume);
-	GLint sdfSize[3] = {(GLint)(dx*scale), (GLint)(dy*scale), (GLint)(dz*scale)};
+	DWORD sdfSize[3] = {(DWORD)(dx*scale), (DWORD)(dy*scale), (DWORD)(dz*scale)};
 	std::cout << sdfSize[0] << ", " << sdfSize[1] << ", " << sdfSize[2] << std::endl;
-	std::cout << "Voxels: " << sdfSize[0]*sdfSize[1]*sdfSize[2] << std::endl;
+	std::cout << "Voxels: " << (QWORD)sdfSize[0]*sdfSize[1]*sdfSize[2] << std::endl;
 	camPos = {(float)sdfSize[0]/2, (float)sdfSize[1]/2, (float)sdfSize[2]/2};
 	// GLuint sdfTextures[3];
 	resetTimer(timer);
@@ -316,43 +316,40 @@ INT WinMain(HINSTANCE hInstance, HINSTANCE hPreviousInst, LPSTR lpszCmdLine, int
 
 
 	//GI Probes berechnen und Speicher allokieren
-	// float min_gi_probes = 10000;
-	// float gi_probe_inv_scale = std::cbrtf((sdfSize[0]*sdfSize[1]*sdfSize[2])/min_gi_probes);
-	// GLint gi_probes[3] = {GLint(std::ceil(sdfSize[0]/gi_probe_inv_scale)), GLint(std::ceil(sdfSize[1]/gi_probe_inv_scale)), GLint(std::ceil(sdfSize[2]/gi_probe_inv_scale))};
-	// std::cout << "GI Probes: " << gi_probes[0] << ", " << gi_probes[1] << ", " << gi_probes[2] << " | " << gi_probes[0]*gi_probes[1]*gi_probes[2] << std::endl;
+	float min_gi_probes = 8000;
+	float gi_probe_inv_scale = std::cbrtf((sdfSize[0]*sdfSize[1]*sdfSize[2])/min_gi_probes);
+	GLint gi_probes[3] = {GLint(std::ceil(sdfSize[0]/gi_probe_inv_scale)), GLint(std::ceil(sdfSize[1]/gi_probe_inv_scale)), GLint(std::ceil(sdfSize[2]/gi_probe_inv_scale))};
+	std::cout << "GI Probes: " << gi_probes[0] << ", " << gi_probes[1] << ", " << gi_probes[2] << " | " << gi_probes[0]*gi_probes[1]*gi_probes[2] << std::endl;
 
-	// const int gi_probe_buffer_size = 4 * 6 * sizeof(float) * gi_probes[0]*gi_probes[1]*gi_probes[2];	//sizeof(vec3) * float[6] * sizeof(float) * Anzahl GI Probes
-	// SSBO gi_probes_buffer[2];
+	const int gi_probe_buffer_size = 4 * 6 * sizeof(float) * gi_probes[0]*gi_probes[1]*gi_probes[2];	//sizeof(vec3) * float[6] * sizeof(float) * Anzahl GI Probes
+	SSBO gi_probes_buffer[2];
 
-	// float* tmpBuffer = alloc<float>(gi_probe_buffer_size/sizeof(float), "tmp gi probes buffer init data");
-	// for(int i=0; i < gi_probe_buffer_size/sizeof(float); ++i) tmpBuffer[i] = 0;
-	// gi_probes_buffer[0].append(tmpBuffer, gi_probe_buffer_size);
-	// gi_probes_buffer[1].append(tmpBuffer, gi_probe_buffer_size);
-	// dealloc(tmpBuffer);
+	float* tmpBuffer = alloc<float>(gi_probe_buffer_size/sizeof(float), "tmp gi probes buffer init data");
+	for(int i=0; i < gi_probe_buffer_size/sizeof(float); ++i) tmpBuffer[i] = 0;
+	gi_probes_buffer[0].append(tmpBuffer, gi_probe_buffer_size);
+	gi_probes_buffer[1].append(tmpBuffer, gi_probe_buffer_size);
+	dealloc(tmpBuffer);
 
-	// GLProgram compute_gi_probes_program;
-	// if(compute_gi_probes_program.attachComputeShader("compute_shaders/calculate_probe_lighting.glsl") != SUCCESS) return -1;
+	GLProgram compute_gi_probes_program;
+	if(compute_gi_probes_program.attachComputeShader("compute_shaders/calculate_probe_lighting.glsl") != SUCCESS) return -1;
 
-	// GPUTimer gpu_timer;
-	// for(int i=0; i < 6; ++i){
-	// 	gpu_timer.restart();
-	// 	gi_probes_buffer[0].set_binding_index((GLuint)i%2);
-	// 	gi_probes_buffer[1].set_binding_index((GLuint)(i+1)%2);
-	// 	compute_gi_probes_program.use();
-	// 	GLuint numGroups = std::ceil((gi_probes[0] * gi_probes[1] * gi_probes[2]) / 256.f);
-	// 	std::cout << "GI Compute Groups: " << numGroups << std::endl;
-	// 	glUniform1i(glGetUniformLocation(compute_gi_probes_program.program, "sdfData"), 1);
-	// 	glUniform1i(glGetUniformLocation(compute_gi_probes_program.program, "sdfData4"), 2);
-	// 	glUniform3i(glGetUniformLocation(compute_gi_probes_program.program, "sdfSize"), sdfSize[0], sdfSize[1], sdfSize[2]);
-	// 	glUniform3i(glGetUniformLocation(compute_gi_probes_program.program, "gi_probe_size"), gi_probes[0], gi_probes[1], gi_probes[2]);
-	// 	glDispatchCompute(numGroups, 1, 1);
-	// 	glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
-	// 	std::cout << "GI-Probes berechnen: " << gpu_timer.getTimeMillis() << "ms" << std::endl;
-	// }
+	GPUTimer gpu_timer;
+	for(int i=0; i < 6; ++i){
+		gpu_timer.restart();
+		gi_probes_buffer[0].set_binding_index((GLuint)i%2);
+		gi_probes_buffer[1].set_binding_index((GLuint)(i+1)%2);
+		compute_gi_probes_program.use();
+		GLuint numGroups = std::ceil((gi_probes[0] * gi_probes[1] * gi_probes[2]) / 256.f);
+		std::cout << "GI Compute Groups: " << numGroups << std::endl;
+		glUniform1i(glGetUniformLocation(compute_gi_probes_program.program, "sdfData"), 1);
+		glUniform1i(glGetUniformLocation(compute_gi_probes_program.program, "sdfData4"), 2);
+		glUniform3i(glGetUniformLocation(compute_gi_probes_program.program, "sdfSize"), sdfSize[0], sdfSize[1], sdfSize[2]);
+		glUniform3i(glGetUniformLocation(compute_gi_probes_program.program, "gi_probe_size"), gi_probes[0], gi_probes[1], gi_probes[2]);
+		glDispatchCompute(numGroups, 1, 1);
+		glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
+		std::cout << "GI-Probes berechnen: " << gpu_timer.getTimeMillis() << "ms" << std::endl;
+	}
 
-
-	// GLProgram place_voxel_program;
-	// if(place_voxel_program.attachComputeShader("compute_shaders/add_emissive_sphere.glsl") != SUCCESS) return -1;
 
 	//Vertex Array erstellen um ein Quad zu zeichnen
     GLuint Verts, VertsVAO;
@@ -378,15 +375,7 @@ INT WinMain(HINSTANCE hInstance, HINSTANCE hPreviousInst, LPSTR lpszCmdLine, int
 		for(void* e : x.second){
 			total += _memAllocsMap[e].size;
 		}
-		const char* sizeNames[] = {"B", "KB", "MB", "GB"};
-		BYTE sizeNameIdx = 0;
-		while(total >= 1000){
-			total /= 1000;
-			sizeNameIdx++;
-		}
-		std::string val = x.first + ": ";
-		val += floatToString(total);
-		val += sizeNames[sizeNameIdx];
+		std::string val = x.first + ": " + memoryUsageToHuman(total);
 		std::cout << val <<  std::endl;
 	}
 
@@ -413,8 +402,6 @@ INT WinMain(HINSTANCE hInstance, HINSTANCE hPreviousInst, LPSTR lpszCmdLine, int
 		// if(!menuOpen){
 		// 	if(getButton(mouse, MOUSE_LMB) && !getButton(mouse, MOUSE_PREV_LMB)){
 		// 		place_voxel_program.use();
-		// 		glUniform1i(glGetUniformLocation(place_voxel_program.program, "sdfData"), 1);
-		// 		glUniform1i(glGetUniformLocation(place_voxel_program.program, "sdfData8"), 2);
 		// 		glUniform3i(glGetUniformLocation(place_voxel_program.program, "sdfSize"), sdfSize[0], sdfSize[1], sdfSize[2]);
 		// 		glUniformMatrix3fv(glGetUniformLocation(place_voxel_program.program, "camRot"), 1, false, rotM);
 		// 		glUniform3f(glGetUniformLocation(place_voxel_program.program, "camPos"), camPos.x, camPos.y, camPos.z);
@@ -423,23 +410,21 @@ INT WinMain(HINSTANCE hInstance, HINSTANCE hPreviousInst, LPSTR lpszCmdLine, int
 		// 	}
 		// }
 
-		// if(getCheckBoxFlag(checkboxes[2], CHECKBOXFLAG_CHECKED)){
-		// 	resetCheckBoxFlag(checkboxes[2], CHECKBOXFLAG_CHECKED);
-		// 	for(int i=0; i < 6; ++i){
-		// 		gpu_timer.restart();
-		// 		gi_probes_buffer[0].set_binding_index((GLuint)i%2);
-		// 		gi_probes_buffer[1].set_binding_index((GLuint)(i+1)%2);
-		// 		compute_gi_probes_program.use();
-		// 		GLuint numGroups = std::ceil((gi_probes[0] * gi_probes[1] * gi_probes[2]) / 256.f);
-		// 		glUniform1i(glGetUniformLocation(compute_gi_probes_program.program, "sdfData"), 1);
-		// 		glUniform1i(glGetUniformLocation(compute_gi_probes_program.program, "sdfData8"), 2);
-		// 		glUniform3i(glGetUniformLocation(compute_gi_probes_program.program, "sdfSize"), sdfSize[0], sdfSize[1], sdfSize[2]);
-		// 		glUniform3i(glGetUniformLocation(compute_gi_probes_program.program, "gi_probe_size"), gi_probes[0], gi_probes[1], gi_probes[2]);
-		// 		glDispatchCompute(numGroups, 1, 1);
-		// 		glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
-		// 		std::cout << "GI-Probes berechnen: " << gpu_timer.getTimeMillis() << "ms" << std::endl;
-		// 	}
-		// }
+		if(getCheckBoxFlag(checkboxes[2], CHECKBOXFLAG_CHECKED)){
+			resetCheckBoxFlag(checkboxes[2], CHECKBOXFLAG_CHECKED);
+			for(int i=0; i < 6; ++i){
+				gpu_timer.restart();
+				gi_probes_buffer[0].set_binding_index((GLuint)i%2);
+				gi_probes_buffer[1].set_binding_index((GLuint)(i+1)%2);
+				compute_gi_probes_program.use();
+				GLuint numGroups = std::ceil((gi_probes[0] * gi_probes[1] * gi_probes[2]) / 256.f);
+				glUniform3i(glGetUniformLocation(compute_gi_probes_program.program, "sdfSize"), sdfSize[0], sdfSize[1], sdfSize[2]);
+				glUniform3i(glGetUniformLocation(compute_gi_probes_program.program, "gi_probe_size"), gi_probes[0], gi_probes[1], gi_probes[2]);
+				glDispatchCompute(numGroups, 1, 1);
+				glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
+				std::cout << "GI-Probes berechnen: " << gpu_timer.getTimeMillis() << "ms" << std::endl;
+			}
+		}
 
         primaryRaymarchProgram.use();
         glBindVertexArray(VertsVAO);
@@ -451,7 +436,7 @@ INT WinMain(HINSTANCE hInstance, HINSTANCE hPreviousInst, LPSTR lpszCmdLine, int
         glUniform3f(glGetUniformLocation(primaryRaymarchProgram.program, "camPos"), camPos.x, camPos.y, camPos.z);
         glUniform2f(glGetUniformLocation(primaryRaymarchProgram.program, "windowSize"), window.windowWidth, window.windowHeight);
 		glUniform3i(glGetUniformLocation(primaryRaymarchProgram.program, "sdfSize"), sdfSize[0], sdfSize[1], sdfSize[2]);
-		// glUniform3i(glGetUniformLocation(primaryRaymarchProgram.program, "gi_probe_size"), gi_probes[0], gi_probes[1], gi_probes[2]);
+		glUniform3i(glGetUniformLocation(primaryRaymarchProgram.program, "gi_probe_size"), gi_probes[0], gi_probes[1], gi_probes[2]);
         glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
 
 		gBuffer.unbind();
@@ -462,19 +447,15 @@ INT WinMain(HINSTANCE hInstance, HINSTANCE hPreviousInst, LPSTR lpszCmdLine, int
 		glUniform2f(glGetUniformLocation(finalProgram.program, "windowSize"), window.windowWidth, window.windowHeight);
 		glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
 
-		float total = getTotalMemoryUsage();
-		const char* sizeNames[] = {"B", "KB", "MB", "GB"};
-		BYTE sizeNameIdx = 0;
-		while(total >= 1000){
-			total /= 1000;
-			sizeNameIdx++;
-		}
-		std::string memoryText = "Memory: ";
-		memoryText += floatToString(total);
-		memoryText += sizeNames[sizeNameIdx];
+		std::string memoryText = "CPU Memory: ";
+		memoryText += memoryUsageToHuman(getTotalMemoryUsage());
         drawFontString(window, font, chars, fpsText.c_str(), 10, 10);
 		drawFontString(window, font, chars, msText.c_str(), 10, 15+font.pixelSize);
 		drawFontString(window, font, chars, memoryText.c_str(), 10, 20+font.pixelSize*2);
+		
+		memoryText = "GPU Memory: ";
+		memoryText += memoryUsageToHuman(brickmap.occupied_size + voxel_data.occupied_size);
+		drawFontString(window, font, chars, memoryText.c_str(), 10, 25+font.pixelSize*3);
 		
 		if(menuOpen) updateCheckBoxes(window, font, checkboxes, sizeof(checkboxes)/sizeof(Checkbox), rectangles, chars);
 

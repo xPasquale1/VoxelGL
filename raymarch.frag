@@ -79,7 +79,6 @@ struct HitData{
 };
 
 //TODO Ist schon viel besser wie zuvor, aber approximiert noch immer bei Übergängen der LODs
-
 HitData trace(vec3 origin, vec3 dir){
     HitData ret;
     ret.didHit = false;
@@ -93,7 +92,6 @@ HitData trace(vec3 origin, vec3 dir){
         int(sign(dir.y)),
         int(sign(dir.z))
     );
-    vec3 step_dir_f = vec3(step_dir);
     int scale = 4;
     ivec3 side_offset = ivec3(step(0.0, dir));
     ivec3 block4 = voxel_pos/4;
@@ -103,7 +101,7 @@ HitData trace(vec3 origin, vec3 dir){
 
     BrickmapNode node;
 
-    for(int i=0; i < 1024; ++i){
+    for(int i=0; i < 2048; ++i){
         if(any(lessThan(voxel_pos, ivec3(0))) || any(greaterThanEqual(voxel_pos, sdfSize))) return ret;
         if(scale == 4){
             block4 = voxel_pos/4;
@@ -111,7 +109,12 @@ HitData trace(vec3 origin, vec3 dir){
             node = brickmap_data[brick_idx];
             if((node.mask_low | node.mask_high) != 0){
                 scale = 1;
-                voxel_pos = ivec3(pos);
+                ivec3 brickBase = block4 * 4;
+                vec3 brickBaseF = vec3(brickBase);
+                vec3 localF = pos - brickBaseF;
+                ivec3 localI = ivec3(floor(localF));
+                localI = clamp(localI, ivec3(0), ivec3(3));
+                voxel_pos = brickBase + localI;
                 continue;
             }
         }else{
@@ -143,106 +146,120 @@ HitData trace(vec3 origin, vec3 dir){
         if(side_dist.x < side_dist.y && side_dist.x < side_dist.z){
             tmin = side_dist.x;
             voxel_pos.x += step_dir.x * scale;
-            normal = vec3(-step_dir_f.x, 0, 0);
-            pos.x = sidePos.x + step_dir_f.x*0.0001;
+            normal = vec3(-step_dir.x, 0, 0);
+            pos.x = sidePos.x;
             pos.y += tmin * dir.y;
             pos.z += tmin * dir.z;
         }else if(side_dist.y < side_dist.z){
             tmin = side_dist.y;
             voxel_pos.y += step_dir.y * scale;
-            normal = vec3(0, -step_dir_f.y, 0);
+            normal = vec3(0, -step_dir.y, 0);
             pos.x += tmin * dir.x;
-            pos.y = sidePos.y + step_dir_f.y*0.0001;
+            pos.y = sidePos.y;
             pos.z += tmin * dir.z;
         }else{
             tmin = side_dist.z;
             voxel_pos.z += step_dir.z * scale;
-            normal = vec3(0, 0, -step_dir_f.z);
+            normal = vec3(0, 0, -step_dir.z);
             pos.x += tmin * dir.x;
             pos.y += tmin * dir.y;
-            pos.z = sidePos.z + step_dir_f.z*0.0001;
+            pos.z = sidePos.z;
         }
     }
     return ret;
 }
 
-// HitData traceMax(vec3 origin, vec3 dir, float max_distance){
-//     HitData ret;
-//     ret.didHit = false;
-//     vec3 normal = vec3(0, 1, 0);
+HitData traceMax(vec3 origin, vec3 dir, float max_distance){
+    HitData ret;
+    ret.didHit = false;
+    vec3 normal = vec3(0, 1, 0);
 
-//     ivec3 voxel_pos = (ivec3(origin) >> 3) << 3;
-//     vec3 inv_dir = 1.0 / dir;
-//     vec3 pos = origin;
-//     ivec3 step_dir = ivec3(
-//         int(sign(dir.x)),
-//         int(sign(dir.y)),
-//         int(sign(dir.z))
-//     );
-//     vec3 step_dir_f = vec3(step_dir);
-//     int scale = 8;
-//     ivec3 side_offset = ivec3(step(0.0, dir));
-//     ivec3 block8 = voxel_pos/8;
-//     ivec3 sidePos = voxel_pos + side_offset * scale;
-//     vec3 side_dist = (sidePos - pos) * inv_dir;
+    ivec3 voxel_pos = (ivec3(origin) >> 2) << 2;
+    vec3 inv_dir = 1.0 / dir;
+    vec3 pos = origin;
+    ivec3 step_dir = ivec3(
+        int(sign(dir.x)),
+        int(sign(dir.y)),
+        int(sign(dir.z))
+    );
+    int scale = 4;
+    ivec3 side_offset = ivec3(step(0.0, dir));
+    ivec3 block4 = voxel_pos/4;
+    ivec3 sidePos = voxel_pos + side_offset * scale;
+    vec3 side_dist = (sidePos - pos) * inv_dir;
+    ivec3 sdfSize4 = (sdfSize + 3) / 4;
 
-//     for(int i=0; i < 1024; ++i){
-//         if(distance(pos, origin) > max_distance) return ret;
-//         if(any(lessThan(voxel_pos, ivec3(0))) || any(greaterThanEqual(voxel_pos, sdfSize))) return ret;
-//         if(scale == 8){
-//             block8 = voxel_pos/8;
-//             uint sdf_data = imageLoad(sdfData8, block8).r;
-//             if(sdf_data > 0){
-//                 scale = 1;
-//                 voxel_pos = ivec3(pos);
-//                 continue;
-//             }
-//         }else{
-//             if(distance(pos, origin) > max_distance) return ret;
-//             if(block8 != voxel_pos/8){
-//                 scale = 8;
-//                 voxel_pos = (voxel_pos >> 3) << 3;
-//                 continue;
-//             }
-//             uvec4 sdf_data = imageLoad(sdfData, voxel_pos);
-//             if(sdf_data.a > 0){
-//                 ret.didHit = true;
-//                 ret.color = vec4(sdf_data)/255.0;
-//                 ret.position = pos;
-//                 ret.normal = normal;
-//                 return ret;
-//             }
-//         }
+    BrickmapNode node;
+
+    for(int i=0; i < 2048; ++i){
+        if(distance(pos, origin) > max_distance) return ret;
+        if(any(lessThan(voxel_pos, ivec3(0))) || any(greaterThanEqual(voxel_pos, sdfSize))) return ret;
+        if(scale == 4){
+            block4 = voxel_pos/4;
+            uint brick_idx = block4.z * sdfSize4.y * sdfSize4.x + block4.y * sdfSize4.x + block4.x;
+            node = brickmap_data[brick_idx];
+            if((node.mask_low | node.mask_high) != 0){
+                scale = 1;
+                ivec3 brickBase = block4 * 4;
+                vec3 brickBaseF = vec3(brickBase);
+                vec3 localF = pos - brickBaseF;
+                ivec3 localI = ivec3(floor(localF));
+                localI = clamp(localI, ivec3(0), ivec3(3));
+                voxel_pos = brickBase + localI;
+                continue;
+            }
+        }else{
+            if(distance(pos, origin) > max_distance) return ret;
+            if(voxel_pos/4 != block4){
+                scale = 4;
+                voxel_pos = (voxel_pos >> 2) << 2;
+                continue;
+            }
+            uint local_x = voxel_pos.x % 4;
+            uint local_y = voxel_pos.y % 4;
+            uint local_z = voxel_pos.z % 4;
+            uint bit_index = local_z * 16 + local_y * 4 + local_x;
+            bool bit_set = (bit_index < 32) ? ((node.mask_low >> bit_index) & 1u) == 1u : ((node.mask_high >> (bit_index - 32)) & 1u) == 1u;
+            if(bit_set){
+                uint data_index = node.offset + bit_index;
+                uint color = voxel_data[data_index];
+                ret.didHit = true;
+                ret.color = decode_color(color);
+                ret.position = pos;
+                ret.normal = normal;
+                return ret;
+            }
+        }
         
-//         sidePos = voxel_pos + side_offset * scale;
-//         side_dist = (sidePos - pos) * inv_dir;
+        sidePos = voxel_pos + side_offset * scale;
+        side_dist = (sidePos - pos) * inv_dir;
 
-//         float tmin;
-//         if(side_dist.x < side_dist.y && side_dist.x < side_dist.z){
-//             tmin = side_dist.x;
-//             voxel_pos.x += step_dir.x * scale;
-//             normal = vec3(-step_dir_f.x, 0, 0);
-//             pos.x = sidePos.x + step_dir_f.x*0.0001;
-//             pos.y += tmin * dir.y;
-//             pos.z += tmin * dir.z;
-//         }else if(side_dist.y < side_dist.z){
-//             tmin = side_dist.y;
-//             voxel_pos.y += step_dir.y * scale;
-//             normal = vec3(0, -step_dir_f.y, 0);
-//             pos.x += tmin * dir.x;
-//             pos.y = sidePos.y + step_dir_f.y*0.0001;
-//             pos.z += tmin * dir.z;
-//         }else{
-//             tmin = side_dist.z;
-//             voxel_pos.z += step_dir.z * scale;
-//             normal = vec3(0, 0, -step_dir_f.z);
-//             pos.x += tmin * dir.x;
-//             pos.y += tmin * dir.y;
-//             pos.z = sidePos.z + step_dir_f.z*0.0001;
-//         }
-//     }
-//     return ret;
-// }
+        float tmin;
+        if(side_dist.x < side_dist.y && side_dist.x < side_dist.z){
+            tmin = side_dist.x;
+            voxel_pos.x += step_dir.x * scale;
+            normal = vec3(-step_dir.x, 0, 0);
+            pos.x = sidePos.x;
+            pos.y += tmin * dir.y;
+            pos.z += tmin * dir.z;
+        }else if(side_dist.y < side_dist.z){
+            tmin = side_dist.y;
+            voxel_pos.y += step_dir.y * scale;
+            normal = vec3(0, -step_dir.y, 0);
+            pos.x += tmin * dir.x;
+            pos.y = sidePos.y;
+            pos.z += tmin * dir.z;
+        }else{
+            tmin = side_dist.z;
+            voxel_pos.z += step_dir.z * scale;
+            normal = vec3(0, 0, -step_dir.z);
+            pos.x += tmin * dir.x;
+            pos.y += tmin * dir.y;
+            pos.z = sidePos.z;
+        }
+    }
+    return ret;
+}
 
 #define GI_SAMPLES 8
 #define GI_SAMPLES2 8
@@ -273,10 +290,10 @@ void main(){
     if(primary_hit_data.didHit){
 
         //Direktes Licht
-        // HitData direct_light_data = trace(primary_hit_data.position + primary_hit_data.normal * 0.01, sky_dir);
-        // if(direct_light_data.didHit == false) direct_light = primary_hit_data.color.rgb * max(dot(primary_hit_data.normal, sky_dir), 0);
+        HitData direct_light_data = trace(primary_hit_data.position, sky_dir);
+        if(direct_light_data.didHit == false) direct_light = primary_hit_data.color.rgb * max(dot(primary_hit_data.normal, sky_dir), 0);
 
-        // rng_state = uint(fract(sin(dot(gl_FragCoord.xy/vec2(1920, 1080), vec2(12.9898, 78.233))) * 43758.5453123) * 1000.0);
+        rng_state = uint(fract(sin(dot(gl_FragCoord.xy/vec2(1920, 1080), vec2(12.9898, 78.233))) * 43758.5453123) * 1000.0);
 
         //GI
         //BRDF und PDF und NdotL werden vernächlässigt, da:
@@ -284,80 +301,80 @@ void main(){
         //BRDF = albedo/PI
         //PDF = 1/PI
         //BRDF/PDF = albedo * PI/PI = albedo
-        // if(gi_enabled > 0){
-        //     for(int i=0; i < GI_SAMPLES; ++i){
-        //         vec3 sample_direction = normalize(primary_hit_data.normal + normalize(vec3(random()*2-1, random()*2-1, random()*2-1)));
-        //         HitData gi_sample_data = trace(primary_hit_data.position + primary_hit_data.normal * 0.01, sample_direction);
-        //         if(gi_sample_data.didHit){
+        if(gi_enabled > 0){
+            for(int i=0; i < GI_SAMPLES; ++i){
+                vec3 sample_direction = normalize(primary_hit_data.normal + normalize(vec3(random()*2-1, random()*2-1, random()*2-1)));
+                HitData gi_sample_data = trace(primary_hit_data.position + primary_hit_data.normal * 0.0001, sample_direction);
+                if(gi_sample_data.didHit){
 
-        //             if(gi_sample_data.color.a > 0.9){
-        //                 indirect_light += vec3(1);
-        //                 continue;
-        //             }
-        //             if(gi_second_bounce > 0){
-        //                 vec3 indirect_light_2 = vec3(0);
-        //                 for(int i=0; i < GI_SAMPLES2; ++i){
-        //                     vec3 sample_direction = normalize(gi_sample_data.normal + normalize(vec3(random()*2-1, random()*2-1, random()*2-1)));
-        //                     HitData gi_2_sample_data = trace(gi_sample_data.position + gi_sample_data.normal * 0.01, sample_direction);
-        //                     if(gi_2_sample_data.didHit){
-        //                         if(gi_2_sample_data.color.a > 0.9){
-        //                             indirect_light_2 += vec3(1);
-        //                             continue;
-        //                         }
-        //                         HitData gi_sample_2_direct_light_data = trace(gi_2_sample_data.position + gi_2_sample_data.normal * 0.01, sky_dir);
-        //                         if(gi_sample_2_direct_light_data.didHit == false) indirect_light_2 += gi_2_sample_data.color.rgb;
-        //                     }else{
-        //                         indirect_light_2 += sky_color;
-        //                     }
-        //                 }
-        //                 indirect_light += indirect_light_2 / float(GI_SAMPLES2);
-        //             }
+                    if(gi_sample_data.color.a > 0.9){
+                        indirect_light += vec3(1);
+                        continue;
+                    }
+                    if(gi_second_bounce > 0){
+                        vec3 indirect_light_2 = vec3(0);
+                        for(int i=0; i < GI_SAMPLES2; ++i){
+                            vec3 sample_direction = normalize(gi_sample_data.normal + normalize(vec3(random()*2-1, random()*2-1, random()*2-1)));
+                            HitData gi_2_sample_data = trace(gi_sample_data.position + gi_sample_data.normal * 0.0001, sample_direction);
+                            if(gi_2_sample_data.didHit){
+                                if(gi_2_sample_data.color.a > 0.9){
+                                    indirect_light_2 += vec3(1);
+                                    continue;
+                                }
+                                HitData gi_sample_2_direct_light_data = trace(gi_2_sample_data.position + gi_2_sample_data.normal * 0.0001, sky_dir);
+                                if(gi_sample_2_direct_light_data.didHit == false) indirect_light_2 += gi_2_sample_data.color.rgb;
+                            }else{
+                                indirect_light_2 += sky_color;
+                            }
+                        }
+                        indirect_light += indirect_light_2 / float(GI_SAMPLES2);
+                    }
 
-        //             HitData gi_sample_direct_light_data = trace(gi_sample_data.position + gi_sample_data.normal * 0.01, sky_dir);
-        //             if(gi_sample_direct_light_data.didHit == false) indirect_light += gi_sample_data.color.rgb;
-        //         }else{
-        //             indirect_light += sky_color;
-        //         }
-        //     }
-        //     indirect_light *= primary_hit_data.color.rgb;
-        //     indirect_light /= float(GI_SAMPLES);
-        // }else{
-        //     vec3 gi_grid_pos = (primary_hit_data.position / vec3(sdfSize)) * vec3(gi_probe_size) - 0.5;
-        //     ivec3 base = ivec3(floor(gi_grid_pos));
-        //     vec3 frac = gi_grid_pos - vec3(base);
-        //     float total_weight = 0;
-        //     for(int z=0; z <= 1; ++z)
-        //     for(int y=0; y <= 1; ++y)
-        //     for(int x=0; x <= 1; ++x){
-        //         ivec3 offset = ivec3(x, y, z);
-        //         ivec3 probe_pos_grid = base + offset;
+                    HitData gi_sample_direct_light_data = trace(gi_sample_data.position + gi_sample_data.normal * 0.0001, sky_dir);
+                    if(gi_sample_direct_light_data.didHit == false) indirect_light += gi_sample_data.color.rgb;
+                }else{
+                    indirect_light += sky_color;
+                }
+            }
+            indirect_light *= primary_hit_data.color.rgb;
+            indirect_light /= float(GI_SAMPLES);
+        }else{
+            vec3 gi_grid_pos = (primary_hit_data.position / vec3(sdfSize)) * vec3(gi_probe_size) - 0.5;
+            ivec3 base = ivec3(floor(gi_grid_pos));
+            vec3 frac = gi_grid_pos - vec3(base);
+            float total_weight = 0;
+            for(int z=0; z <= 1; ++z)
+            for(int y=0; y <= 1; ++y)
+            for(int x=0; x <= 1; ++x){
+                ivec3 offset = ivec3(x, y, z);
+                ivec3 probe_pos_grid = base + offset;
 
-        //         if(any(lessThan(probe_pos_grid, ivec3(0))) || any(greaterThanEqual(probe_pos_grid, gi_probe_size))) continue;
+                if(any(lessThan(probe_pos_grid, ivec3(0))) || any(greaterThanEqual(probe_pos_grid, gi_probe_size))) continue;
 
-        //         float wx = (x == 0) ? 1.0 - frac.x : frac.x;
-        //         float wy = (y == 0) ? 1.0 - frac.y : frac.y;
-        //         float wz = (z == 0) ? 1.0 - frac.z : frac.z;
-        //         float weight = wx * wy * wz;
+                float wx = (x == 0) ? 1.0 - frac.x : frac.x;
+                float wy = (y == 0) ? 1.0 - frac.y : frac.y;
+                float wz = (z == 0) ? 1.0 - frac.z : frac.z;
+                float weight = wx * wy * wz;
 
-        //         vec3 world_pos = (vec3(probe_pos_grid) + 0.5) * vec3(sdfSize) / vec3(gi_probe_size);
-        //         HitData hit_data = traceMax(primary_hit_data.position + primary_hit_data.normal * 0.01, normalize(world_pos - primary_hit_data.position), distance(world_pos, primary_hit_data.position));
-        //         if(hit_data.didHit) continue;
+                vec3 world_pos = (vec3(probe_pos_grid) + 0.5) * vec3(sdfSize) / vec3(gi_probe_size);
+                HitData hit_data = traceMax(primary_hit_data.position + primary_hit_data.normal * 0.0001, normalize(world_pos - primary_hit_data.position), distance(world_pos, primary_hit_data.position));
+                if(hit_data.didHit) continue;
 
-        //         uint probe_idx = probe_pos_grid.z * gi_probe_size.y * gi_probe_size.x + probe_pos_grid.y * gi_probe_size.x + probe_pos_grid.x;
-        //         total_weight += weight;
+                uint probe_idx = probe_pos_grid.z * gi_probe_size.y * gi_probe_size.x + probe_pos_grid.y * gi_probe_size.x + probe_pos_grid.x;
+                total_weight += weight;
 
-        //         for(int d=0; d < 6; ++d){
-        //             float n_dot_dir = max(dot(primary_hit_data.normal, directions[d]), 0.0);
-        //             indirect_light += gi_data[probe_idx].light[d].rgb * n_dot_dir * weight;
-        //         }
-        //     }
-        //     if(total_weight > 0.0) indirect_light /= total_weight;
-        // }
+                for(int d=0; d < 6; ++d){
+                    float n_dot_dir = max(dot(primary_hit_data.normal, directions[d]), 0.0);
+                    indirect_light += gi_data[probe_idx].light[d].rgb * n_dot_dir * weight;
+                }
+            }
+            if(total_weight > 0.0) indirect_light /= total_weight;
+        }
 
         // lighting.rgb = direct_light;
         // lighting.rgb = indirect_light;
-        // lighting.rgb = direct_light + indirect_light * primary_hit_data.color.rgb + primary_hit_data.color.rgb * ambient;
-        lighting.rgb = primary_hit_data.color.rgb;
+        lighting.rgb = direct_light + indirect_light * primary_hit_data.color.rgb + primary_hit_data.color.rgb * ambient;
+        // lighting.rgb = primary_hit_data.color.rgb;
         return;
     }
     lighting.rgb = sky_color;

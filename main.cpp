@@ -92,6 +92,23 @@ struct GLProgram{
 	}
 };
 
+struct VoxelRaymarchData{
+	SSBO hit_voxel;				//Speichert alle getroffenen Voxel als Index in voxel_data + face index + vec4 lighting
+	SSBO pixel_to_hit_voxel;	//Speichert welcher pixel zu welchem index im hit_voxel gehört
+
+	VoxelRaymarchData(){
+		hit_voxel.set_binding_index(4);
+		pixel_to_hit_voxel.set_binding_index(5);
+	}
+
+	void resize(WORD width, WORD height){
+		hit_voxel.realloc(width * height * (4 + 4 + 4 * 4));
+		pixel_to_hit_voxel.realloc(width * height * 4);
+	}
+};
+
+VoxelRaymarchData* global_raymarch_data = nullptr;
+
 struct GBuffer{
 	//Framebuffer Objekt
 	GLuint framebuffer = 0;
@@ -181,67 +198,6 @@ struct GPUTimer{
 	}
 };
 
-struct TreeNode{
-	QWORD child_mask;
-};
-
-void createSDFLevels(TriangleModel* models, DWORD modelCount, GLuint* texture, GLint dx, GLint dy, GLint dz){
-    glGenTextures(3, texture);
-    glBindTexture(GL_TEXTURE_3D, texture[0]);
-
-	glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
-	glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
-	glPixelStorei(GL_UNPACK_IMAGE_HEIGHT, 0);
-
-    DWORD* sdfData = alloc<DWORD>(dx*dy*dz, "SDF Daten");
-	for(DWORD i=0; i < dx*dy*dz; ++i) sdfData[i] = 0;
-
-	calculateSDFFromMesh(sdfData, dx, dy, dz, models, modelCount);
-	for(GLint y=0; y < dy; ++y) sdfData[0 * dy * dx + y * dx + 0] = RGBA(255, 255, 255, 128);
-	for(GLint y=0; y < dy; ++y) sdfData[(dz-1) * dy * dx + y * dx + 0] = RGBA(255, 255, 255, 128);
-	for(GLint y=0; y < dy; ++y) sdfData[0 * dy * dx + y * dx + (dx-1)] = RGBA(255, 255, 255, 128);
-	for(GLint y=0; y < dy; ++y) sdfData[(dz-1) * dy * dx + y * dx + (dx-1)] = RGBA(255, 255, 255, 128);
-
-    glTexImage3D(GL_TEXTURE_3D, 0, GL_RGBA8UI, dx, dy, dz, 0, GL_BGRA_INTEGER, GL_UNSIGNED_BYTE, sdfData);
-	glBindImageTexture(1, texture[0], 0, GL_TRUE, 0, GL_READ_WRITE, GL_RGBA8UI);
-	glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-
-	GLint mipdx8 = std::ceil((float)dx/8);
-	GLint mipdy8 = std::ceil((float)dy/8);
-	GLint mipdz8 = std::ceil((float)dz/8);
-	BYTE* sdfMipMap8 = alloc<BYTE>(mipdx8*mipdy8*mipdz8, "SDF MipMap8");
-
-	for(GLint i=0; i < mipdx8*mipdy8*mipdz8; ++i) sdfMipMap8[i] = 0;
-	for(GLint x=0; x < dx; ++x){
-		for(GLint y=0; y < dy; ++y){
-			for(GLint z=0; z < dz; ++z){
-				if(A(sdfData[z * dy * dx + y * dx + x]) > 0) sdfMipMap8[(z/8) * mipdy8 * mipdx8 + (y/8) * mipdx8 + (x/8)] = 255;
-			}
-		}
-	}
-	glBindTexture(GL_TEXTURE_3D, texture[1]);
-	glTexImage3D(GL_TEXTURE_3D, 0, GL_R8UI, mipdx8, mipdy8, mipdz8, 0, GL_RED_INTEGER, GL_UNSIGNED_BYTE, sdfMipMap8);
-	glBindImageTexture(2, texture[1], 0, GL_TRUE, 0, GL_READ_WRITE, GL_R8UI);
-    glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-
-	//Speichernutzung ausgeben
-	float total = getMemoryUsageByTag("SDF Daten");
-	total += getMemoryUsageByTag("SDF MipMap8");
-	const char* sizeNames[] = {"B", "KB", "MB", "GB"};
-	BYTE sizeNameIdx = 0;
-	while(total >= 1000){
-		total /= 1000;
-		sizeNameIdx++;
-	}
-	std::string memoryText = "GPU Memory: ";
-	memoryText += floatToString(total);
-	memoryText += sizeNames[sizeNameIdx];
-	std::cout << memoryText << std::endl;
-	//TODO Sollte natürlich deallokiert werden
-	// dealloc(sdfData);
-	// dealloc(sdfMipMap8);
-}
-
 LRESULT CALLBACK windowCallback(HWND, UINT, WPARAM, LPARAM);
 INT WinMain(HINSTANCE hInstance, HINSTANCE hPreviousInst, LPSTR lpszCmdLine, int nCmdShow){
 	Window window;
@@ -249,6 +205,9 @@ INT WinMain(HINSTANCE hInstance, HINSTANCE hPreviousInst, LPSTR lpszCmdLine, int
 
 	GBuffer gBuffer(1000, 1000);
 	globalGBufferRef = &gBuffer;
+
+	VoxelRaymarchData raymarch_data;
+	global_raymarch_data = &raymarch_data;
 
     Font font;
     if(ErrCheck(loadTTF(font, "fonts/OpenSans-Bold.ttf"), "Font laden") != SUCCESS) return -1;
@@ -300,7 +259,7 @@ INT WinMain(HINSTANCE hInstance, HINSTANCE hPreviousInst, LPSTR lpszCmdLine, int
 	float dy = modelMax.y-modelMin.y;
 	float dz = modelMax.z-modelMin.z;
 	float totalVolume = dx*dy*dz;
-	float targetVolume = 20'000'000'000;
+	float targetVolume = 400'000'000;
 	float scale = std::cbrtf(targetVolume/totalVolume);
 	DWORD sdfSize[3] = {(DWORD)(dx*scale), (DWORD)(dy*scale), (DWORD)(dz*scale)};
 	std::cout << sdfSize[0] << ", " << sdfSize[1] << ", " << sdfSize[2] << std::endl;
@@ -316,7 +275,7 @@ INT WinMain(HINSTANCE hInstance, HINSTANCE hPreviousInst, LPSTR lpszCmdLine, int
 
 
 	//GI Probes berechnen und Speicher allokieren
-	float min_gi_probes = 8000;
+	float min_gi_probes = 10000;
 	float gi_probe_inv_scale = std::cbrtf((sdfSize[0]*sdfSize[1]*sdfSize[2])/min_gi_probes);
 	GLint gi_probes[3] = {GLint(std::ceil(sdfSize[0]/gi_probe_inv_scale)), GLint(std::ceil(sdfSize[1]/gi_probe_inv_scale)), GLint(std::ceil(sdfSize[2]/gi_probe_inv_scale))};
 	std::cout << "GI Probes: " << gi_probes[0] << ", " << gi_probes[1] << ", " << gi_probes[2] << " | " << gi_probes[0]*gi_probes[1]*gi_probes[2] << std::endl;
@@ -523,6 +482,7 @@ LRESULT CALLBACK windowCallback(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lPar
 			if(!width || !height) break;
 			ErrCheck(setWindowFlag(*window, WINDOW_RESIZE), "setzte resize Fensterstatus");
 			ErrCheck(resizeWindow(*window, width, height, 1), "Fenster skalieren");
+			if(global_raymarch_data) global_raymarch_data->resize(width, height);
 			if(globalGBufferRef) globalGBufferRef->resize(width, height);
 			break;
 		}

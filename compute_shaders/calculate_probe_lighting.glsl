@@ -253,7 +253,7 @@ HitData traceMax(vec3 origin, vec3 dir, float max_distance){
     return ret;
 }
 
-#define GI_SAMPLES 32
+#define GI_SAMPLES 64
 const vec3 directions[6] = vec3[6](
     vec3(1, 0, 0),
     vec3(-1, 0, 0),

@@ -6,11 +6,11 @@ This Project converts .obj files to voxel scenes and renders them using OpenGL.
 
 # Features
 
-Font rendering using .ttf
-Decent memeory usage
-Direct sun Lighting
-Probe based global illumination
-Raytraced single (or double) bounce GI
+Font rendering using .ttf <br>
+Decent memeory usage <br>
+Direct sun Lighting <br>
+Probe based global illumination <br>
+Raytraced single (or double) bounce GI <br>
 
 # Installation
 

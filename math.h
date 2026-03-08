@@ -58,8 +58,8 @@ constexpr float dot(const fvec3& a, const fvec3& b)noexcept{return (a.x * b.x + 
 constexpr float dot(const fvec2& a, const fvec2& b)noexcept{return (a.x * b.x + a.y * b.y);}
 constexpr float dot(fvec2& a, fvec2& b)noexcept{return (a.x * b.x + a.y * b.y);}
 constexpr float cross(fvec2 a, fvec2 b)noexcept{return (a.x * b.y - a.y * b.x);}
-constexpr float cross(fvec2& a, fvec2& b)noexcept{return (a.x * b.y - a.y * b.x);}
-constexpr fvec3 cross(fvec3& a, fvec3& b)noexcept{return {a.y*b.z-a.z*b.y, a.z*b.x-a.x*b.z, a.x*b.y-a.y*b.x};}
+constexpr float cross(const fvec2& a, const fvec2& b)noexcept{return (a.x * b.y - a.y * b.x);}
+constexpr fvec3 cross(const fvec3& a, const fvec3& b)noexcept{return {a.y*b.z-a.z*b.y, a.z*b.x-a.x*b.z, a.x*b.y-a.y*b.x};}
 
 constexpr float deg2rad(float deg)noexcept{return deg*PI/180;}
 constexpr float rad2deg(float rad)noexcept{return rad*180/PI;}

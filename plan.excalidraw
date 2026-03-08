@@ -195,13 +195,19 @@
       "lastCommittedPoint": null,
       "startBinding": {
         "elementId": "EBnGkSo2bfu7g9tf7Wupj",
-        "focus": 0.9030143606403365,
-        "gap": 10
+        "mode": "orbit",
+        "fixedPoint": [
+          0.9319994303645626,
+          0.06800056963543921
+        ]
       },
       "endBinding": {
         "elementId": "LG_jsfCTFT0g4PMlxpZEk",
-        "focus": 0.4177809898192097,
-        "gap": 1.4285714285714448
+        "mode": "orbit",
+        "fixedPoint": [
+          0.7205763841985655,
+          0.7205763841985652
+        ]
       },
       "startArrowhead": null,
       "endArrowhead": "arrow",
@@ -299,13 +305,19 @@
       "lastCommittedPoint": null,
       "startBinding": {
         "elementId": "vCo3RqwEmhoPF7OZ7kWjq",
-        "focus": 0.8552577472510486,
-        "gap": 10.000000000000455
+        "mode": "orbit",
+        "fixedPoint": [
+          0.9104758635024279,
+          0.9104758635024303
+        ]
       },
       "endBinding": {
         "elementId": "bKGlpOCW8_aQvmXaCYBBe",
-        "focus": 0.2819637968644227,
-        "gap": 8.571428571428442
+        "mode": "orbit",
+        "fixedPoint": [
+          0.16994682116420443,
+          0.8300531788357982
+        ]
       },
       "startArrowhead": null,
       "endArrowhead": "arrow",
@@ -353,13 +365,19 @@
       "lastCommittedPoint": null,
       "startBinding": {
         "elementId": "bKGlpOCW8_aQvmXaCYBBe",
-        "focus": -0.6008988965297477,
-        "gap": 11.428571428571104
+        "mode": "orbit",
+        "fixedPoint": [
+          0.16889514222710644,
+          0.16889514222710658
+        ]
       },
       "endBinding": {
         "elementId": "EBnGkSo2bfu7g9tf7Wupj",
-        "focus": 0.4935738303496633,
-        "gap": 14.999999999999886
+        "mode": "orbit",
+        "fixedPoint": [
+          0.16271430834603906,
+          0.8372856916539613
+        ]
       },
       "startArrowhead": null,
       "endArrowhead": "arrow",
@@ -407,13 +425,19 @@
       "lastCommittedPoint": null,
       "startBinding": {
         "elementId": "EBnGkSo2bfu7g9tf7Wupj",
-        "focus": -0.39561439350555716,
-        "gap": 9.000000000000057
+        "mode": "orbit",
+        "fixedPoint": [
+          0.32744928317383915,
+          0.32744928317383937
+        ]
       },
       "endBinding": {
         "elementId": "1Le1zsOqQRMn_jOuOmFdI",
-        "focus": -0.3265908487196906,
-        "gap": 15.00000000000017
+        "mode": "orbit",
+        "fixedPoint": [
+          0.5900533601362783,
+          0.5900533601362778
+        ]
       },
       "startArrowhead": null,
       "endArrowhead": "arrow",
@@ -511,13 +535,19 @@
       "lastCommittedPoint": null,
       "startBinding": {
         "elementId": "1Le1zsOqQRMn_jOuOmFdI",
-        "focus": -0.18385954465512652,
-        "gap": 14
+        "mode": "orbit",
+        "fixedPoint": [
+          0.48437370048979095,
+          0.5156262995102091
+        ]
       },
       "endBinding": {
         "elementId": "EBnGkSo2bfu7g9tf7Wupj",
-        "focus": -0.5161006981618987,
-        "gap": 18.6428096544588
+        "mode": "orbit",
+        "fixedPoint": [
+          0.2570896012701808,
+          0.257089601270181
+        ]
       },
       "startArrowhead": null,
       "endArrowhead": "arrow",
@@ -565,13 +595,19 @@
       "lastCommittedPoint": null,
       "startBinding": {
         "elementId": "1Le1zsOqQRMn_jOuOmFdI",
-        "focus": 0.5768788962084032,
-        "gap": 15
+        "mode": "orbit",
+        "fixedPoint": [
+          0,
+          0.5001
+        ]
       },
       "endBinding": {
         "elementId": "LG_jsfCTFT0g4PMlxpZEk",
-        "focus": -0.5595436346831624,
-        "gap": 6.000000000000114
+        "mode": "orbit",
+        "fixedPoint": [
+          0.15571771831696882,
+          0.15571771831696993
+        ]
       },
       "startArrowhead": null,
       "endArrowhead": "arrow",
@@ -665,13 +701,19 @@
       "lastCommittedPoint": null,
       "startBinding": {
         "elementId": "EBnGkSo2bfu7g9tf7Wupj",
-        "focus": -0.658779731456202,
-        "gap": 15.571428571428669
+        "mode": "orbit",
+        "fixedPoint": [
+          0.0406550264213796,
+          0.9593449735786207
+        ]
       },
       "endBinding": {
         "elementId": "JiDE8xDpa9W6Z5Xusphh5",
-        "focus": 0.30092805890592483,
-        "gap": 14
+        "mode": "orbit",
+        "fixedPoint": [
+          0.7114673823141952,
+          0.7114673823141959
+        ]
       },
       "startArrowhead": null,
       "endArrowhead": "arrow",
@@ -719,13 +761,19 @@
       "lastCommittedPoint": null,
       "startBinding": {
         "elementId": "vCo3RqwEmhoPF7OZ7kWjq",
-        "focus": -0.7503482606053294,
-        "gap": 9.604420750841152
+        "mode": "orbit",
+        "fixedPoint": [
+          0.13411729202096198,
+          0.13411729202096126
+        ]
       },
       "endBinding": {
         "elementId": "JiDE8xDpa9W6Z5Xusphh5",
-        "focus": -0.2090332625544847,
-        "gap": 16
+        "mode": "orbit",
+        "fixedPoint": [
+          0.4404352677601487,
+          0.5595647322398508
+        ]
       },
       "startArrowhead": null,
       "endArrowhead": "arrow",
@@ -849,17 +897,134 @@
       "lastCommittedPoint": null,
       "startBinding": {
         "elementId": "hOyFgzQlF9wQ6PQReFREA",
-        "focus": 0.03961601833941913,
-        "gap": 5.054616007230198
+        "mode": "orbit",
+        "fixedPoint": [
+          0,
+          0.5001
+        ]
       },
       "endBinding": {
         "elementId": "bKGlpOCW8_aQvmXaCYBBe",
-        "focus": -0.5319756625664809,
-        "gap": 11.697535923549367
+        "mode": "orbit",
+        "fixedPoint": [
+          0.7881423182320585,
+          0.21185768176794378
+        ]
       },
       "startArrowhead": null,
       "endArrowhead": "arrow",
       "elbowed": false
+    },
+    {
+      "id": "ME4RTgL97bTiaUuclBwQz",
+      "type": "text",
+      "x": 1774.481600652422,
+      "y": 934.3297442997692,
+      "width": 243.1798095703125,
+      "height": 50,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 1,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "index": "b0B",
+      "roundness": null,
+      "seed": 84125448,
+      "version": 33,
+      "versionNonce": 2109572872,
+      "isDeleted": false,
+      "boundElements": null,
+      "updated": 1772733293863,
+      "link": null,
+      "locked": false,
+      "text": "Raymarching Algorithmus:\n- ....",
+      "fontSize": 20,
+      "fontFamily": 5,
+      "textAlign": "left",
+      "verticalAlign": "top",
+      "containerId": null,
+      "originalText": "Raymarching Algorithmus:\n- ....",
+      "autoResize": true,
+      "lineHeight": 1.25
+    },
+    {
+      "id": "-xSNBr2GEd_ffE4id9XXy",
+      "type": "text",
+      "x": 2155.592711763533,
+      "y": 1022.107522077547,
+      "width": 812.45947265625,
+      "height": 125,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 1,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "index": "b0C",
+      "roundness": null,
+      "seed": 1570021496,
+      "version": 359,
+      "versionNonce": 1615809144,
+      "isDeleted": false,
+      "boundElements": null,
+      "updated": 1772734519152,
+      "link": null,
+      "locked": false,
+      "text": "Voxel-Baum Datenstruktur:\n- 64-Tree\n- Äste sind TreeEntries mit voxel_index != 0xFFFFFFFF\n- Äste die keine Blätter haben sind TreeEntries mit children_mask == 0\n- Blätter sind TreeEntries mit children_mask == 0 und voxel_index != 0xFFFFFFFF",
+      "fontSize": 20,
+      "fontFamily": 5,
+      "textAlign": "left",
+      "verticalAlign": "top",
+      "containerId": null,
+      "originalText": "Voxel-Baum Datenstruktur:\n- 64-Tree\n- Äste sind TreeEntries mit voxel_index != 0xFFFFFFFF\n- Äste die keine Blätter haben sind TreeEntries mit children_mask == 0\n- Blätter sind TreeEntries mit children_mask == 0 und voxel_index != 0xFFFFFFFF",
+      "autoResize": true,
+      "lineHeight": 1.25
+    },
+    {
+      "id": "ord-_LEGry-5USh5fhtmh",
+      "type": "text",
+      "x": 1460.0372240248175,
+      "y": 1172.107481387443,
+      "width": 766.1395263671875,
+      "height": 100,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 1,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "index": "b0D",
+      "roundness": null,
+      "seed": 785603080,
+      "version": 248,
+      "versionNonce": 2010289528,
+      "isDeleted": false,
+      "boundElements": null,
+      "updated": 1772733970823,
+      "link": null,
+      "locked": false,
+      "text": "struct TreeEntry{\n    uint32_t voxel_data_index; <- Muss eventuell auf 64 Bit erweitert werden\n    uint64_t children_mask;\n}",
+      "fontSize": 20,
+      "fontFamily": 5,
+      "textAlign": "left",
+      "verticalAlign": "top",
+      "containerId": null,
+      "originalText": "struct TreeEntry{\n    uint32_t voxel_data_index; <- Muss eventuell auf 64 Bit erweitert werden\n    uint64_t children_mask;\n}",
+      "autoResize": true,
+      "lineHeight": 1.25
     }
   ],
   "appState": {

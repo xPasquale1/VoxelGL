@@ -17,6 +17,8 @@ float rotM[9]{
 };
 bool menuOpen = true;
 
+enum BINDIINDICES {};
+
 Checkbox checkboxes[3];
 
 struct GLProgram{
@@ -259,7 +261,7 @@ INT WinMain(HINSTANCE hInstance, HINSTANCE hPreviousInst, LPSTR lpszCmdLine, int
 	float dy = modelMax.y-modelMin.y;
 	float dz = modelMax.z-modelMin.z;
 	float totalVolume = dx*dy*dz;
-	float targetVolume = 400'000'000;
+	float targetVolume = 100'000'000;
 	float scale = std::cbrtf(targetVolume/totalVolume);
 	DWORD sdfSize[3] = {(DWORD)(dx*scale), (DWORD)(dy*scale), (DWORD)(dz*scale)};
 	std::cout << sdfSize[0] << ", " << sdfSize[1] << ", " << sdfSize[2] << std::endl;
@@ -406,13 +408,13 @@ INT WinMain(HINSTANCE hInstance, HINSTANCE hPreviousInst, LPSTR lpszCmdLine, int
 		glUniform2f(glGetUniformLocation(finalProgram.program, "windowSize"), window.windowWidth, window.windowHeight);
 		glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
 
-		std::string memoryText = "CPU Memory: ";
+		std::string memoryText = "RAM Memory: ";
 		memoryText += memoryUsageToHuman(getTotalMemoryUsage());
         drawFontString(window, font, chars, fpsText.c_str(), 10, 10);
 		drawFontString(window, font, chars, msText.c_str(), 10, 15+font.pixelSize);
 		drawFontString(window, font, chars, memoryText.c_str(), 10, 20+font.pixelSize*2);
 		
-		memoryText = "GPU Memory: ";
+		memoryText = "VRAM Memory: ";
 		memoryText += memoryUsageToHuman(brickmap.occupied_size + voxel_data.occupied_size);
 		drawFontString(window, font, chars, memoryText.c_str(), 10, 25+font.pixelSize*3);
 		

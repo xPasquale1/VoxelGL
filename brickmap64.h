@@ -214,3 +214,177 @@ void calculateBrickmapFromMesh(SSBO& low_lod, SSBO& high_lod, DWORD dx, DWORD dy
 	std::cout << "Voxeldaten Größe: " << memoryUsageToHuman(voxel_data.size() * sizeof(DWORD)) << std::endl;
 	std::cout << "Nicht leere Voxel: " << non_air_voxels << std::endl;
 }
+
+/*
+	Speichert jeden Eintrag im 64-Tree
+	- Äste sind Einträge mit index != 0xFFFFFFFF
+	- Äste ohne Blätter sind Einträge mit children_mask == 0
+	- Blätter sind Einträge mit children_mask == 0 und index != 0xFFFFFFFF
+	- Kinder werden packed gespeichert, sprich es wird nur so viel Speicher allokiert wie es auch Kinder gibt
+	- Ein Kind kann dann gefunden werden per Basepointer + popcount der children_mask
+
+	TODO
+	- Algorithmus der den Baum neu anordnet für bessere Speicherlokalität
+*/
+
+struct ivec3{
+	int x;
+	int y;
+	int z;
+};
+
+struct Tree64{
+	static const uint32_t INVALID_NODE = 0xFFFFFFFF;
+
+	struct Node{
+		uint64_t children_mask;
+		uint32_t index;			// TODO Kann evtl. auf 64 Bit erweitert werden
+	};
+
+	struct BuildNode{
+		uint32_t children_pointer[64];
+
+		BuildNode(){
+			for(uint8_t i=0; i < 64; ++i) children_pointer[i] = INVALID_NODE;
+		}
+	};
+
+	std::vector<Node> tree_data;
+	std::vector<BuildNode> build_tree_data;
+	std::vector<uint32_t> voxel_data;
+	uint8_t depth;
+	
+	Tree64(uint8_t tree_depth = 5){
+		assert(depth >= 1);
+		depth = tree_depth;
+		tree_data.push_back({0, 0});
+		build_tree_data.push_back(BuildNode());
+	}
+
+	// TODO Implementieren
+	// void clear(){}
+	
+	void make_sparse(std::vector<Node>& tree)noexcept{
+		// ...
+		build_tree_data.clear();
+	}
+
+	void insert_voxel(ivec3 position, uint32_t voxel)noexcept{
+		assert(build_tree_data.size() > 0);
+
+		uint32_t current_index = 0;
+		for(uint8_t i=0; i < depth; ++i){
+			uint32_t shift = (depth - i - 1) * 2;
+			uint32_t x = (position.x >> shift) & 0b11;
+			uint32_t y = (position.y >> shift) & 0b11;
+			uint32_t z = (position.z >> shift) & 0b11;
+
+			uint32_t index = x | (y << 2) | (z << 4);
+			if(build_tree_data[current_index].children_pointer[index] == INVALID_NODE){
+				build_tree_data.push_back(BuildNode());
+				build_tree_data[current_index].children_pointer[index] = build_tree_data.size() - 1;
+			}
+			current_index = build_tree_data[current_index].children_pointer[index];
+		}
+		if(build_tree_data[current_index].children_pointer[0] == INVALID_NODE){
+			voxel_data.push_back(voxel);
+			build_tree_data[current_index].children_pointer[0] = voxel_data.size() - 1;
+		}else{
+			uint32_t voxel_data_index = build_tree_data[current_index].children_pointer[0];
+			voxel_data[voxel_data_index] = voxel;
+		}
+	}
+
+	// TODO Implementieren
+	// void remove_voxel(){}
+
+	void add_mesh(TriangleModel* models, DWORD modelCount)noexcept{
+		float minX = std::numeric_limits<float>::max(), minY = std::numeric_limits<float>::max(), minZ = std::numeric_limits<float>::max();
+		float maxX = -std::numeric_limits<float>::max(), maxY = -std::numeric_limits<float>::max(), maxZ = -std::numeric_limits<float>::max();
+
+		for(DWORD i=0; i < modelCount; ++i){
+			const TriangleModel& model = models[i];
+			for(DWORD j=0; j < model.triangleCount; ++j){
+				const Triangle& tri = model.triangles[j];
+				for(int k=0; k < 3; ++k){
+					const fvec3& point = tri.points[k];
+					minX = min(minX, point.x);
+					minY = min(minY, point.y);
+					minZ = min(minZ, point.z);
+					maxX = max(maxX, point.x);
+					maxY = max(maxY, point.y);
+					maxZ = max(maxZ, point.z);
+				}
+			}
+		}
+
+		float modelSizeX = maxX - minX;
+		float modelSizeY = maxY - minY;
+		float modelSizeZ = maxZ - minZ;
+
+		float voxelVolumeSize = std::pow(4, depth);
+
+		float modelScaleFactor = max(modelSizeX, max(modelSizeY, modelSizeZ));
+		float invModelScaleFactor = 1.f / modelScaleFactor;
+
+		DWORD non_air_voxels = 0;
+
+		for(DWORD i=0; i < modelCount; ++i){
+			const TriangleModel& model = models[i];
+			for(DWORD j = 0; j < model.triangleCount; ++j){
+				fvec3 point1 = model.triangles[j].points[0];
+				fvec3 point2 = model.triangles[j].points[1];
+				fvec3 point3 = model.triangles[j].points[2];
+
+				point1.x = (point1.x - minX) * voxelVolumeSize * invModelScaleFactor;
+				point1.y = (point1.y - minY) * voxelVolumeSize * invModelScaleFactor;
+				point1.z = (point1.z - minZ) * voxelVolumeSize * invModelScaleFactor;
+
+				point2.x = (point2.x - minX) * voxelVolumeSize * invModelScaleFactor;
+				point2.y = (point2.y - minY) * voxelVolumeSize * invModelScaleFactor;
+				point2.z = (point2.z - minZ) * voxelVolumeSize * invModelScaleFactor;
+
+				point3.x = (point3.x - minX) * voxelVolumeSize * invModelScaleFactor;
+				point3.y = (point3.y - minY) * voxelVolumeSize * invModelScaleFactor;
+				point3.z = (point3.z - minZ) * voxelVolumeSize * invModelScaleFactor;
+
+				float minSDFX = max(min(point1.x, min(point2.x, point3.x))-1, 0.f);
+				float minSDFY = max(min(point1.y, min(point2.y, point3.y))-1, 0.f);
+				float minSDFZ = max(min(point1.z, min(point2.z, point3.z))-1, 0.f);
+				float maxSDFX = min(max(point1.x, max(point2.x, point3.x))+1, voxelVolumeSize-1);
+				float maxSDFY = min(max(point1.y, max(point2.y, point3.y))+1, voxelVolumeSize-1);
+				float maxSDFZ = min(max(point1.z, max(point2.z, point3.z))+1, voxelVolumeSize-1);
+
+				for(int x = minSDFX; x <= maxSDFX; ++x){
+					for(int y = minSDFY; y <= maxSDFY; ++y){
+						for(int z = minSDFZ; z <= maxSDFZ; ++z){
+							fvec3 voxel_center_mesh = {(x + 0.5f) * modelSizeX / (voxelVolumeSize-1) + minX, (y + 0.5f) * modelSizeY / (voxelVolumeSize-1) + minY, (z + 0.5f) * modelSizeZ / (voxelVolumeSize-1) + minZ};
+
+							if(triangleAABBIntersection(point1, point2, point3, {{(float)x, (float)y, (float)z}, {(float)(x+1), (float)(y+1), (float)(z+1)}})){
+								BarycentricCoords coords = getBarycentricFromPoint(voxel_center_mesh, model.triangles[j]);
+
+								float u1 = model.attributesBuffer[j * model.attributesCount * 3 ];
+								float v1 = model.attributesBuffer[j * model.attributesCount * 3 + 1];
+								float u2 = model.attributesBuffer[j * model.attributesCount * 3 + model.attributesCount];
+								float v2 = model.attributesBuffer[j * model.attributesCount * 3 + model.attributesCount + 1];
+								float u3 = model.attributesBuffer[j * model.attributesCount * 3 + model.attributesCount * 2];
+								float v3 = model.attributesBuffer[j * model.attributesCount * 3 + model.attributesCount * 2 + 1];
+								float u = coords.u * u1 + coords.v * u2 + coords.w * u3;
+								float v = coords.u * v1 + coords.v * v2 + coords.w * v3;
+
+								DWORD voxel_data = RGBA(255, 255, 255, 128);
+								if(model.material){
+									voxel_data = textureRepeated(model.material->textures[0], u, v);
+									voxel_data = A(voxel_data, 128);
+								}
+								non_air_voxels += 1;
+								insert_voxel({x, y, z}, voxel_data);
+							}
+						}
+					}
+				}
+			}
+		}
+		std::cout << "Mesh hat " << non_air_voxels << " voxel belegt." << std::endl;
+	}
+};
